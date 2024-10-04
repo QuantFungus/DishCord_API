@@ -2,8 +2,6 @@
 
 ###   Fall 2024
 
-Proposal last updated 9/27/24
-
 #### Members:
 - Isaih Bernardo - bernai@rpi.edu - 4 credits
 
