@@ -5,7 +5,7 @@
 #### Members:
 - Isaih Bernardo - bernai@rpi.edu - 4 credits
 
- - William Lin - linw10@rpi.edu - 4 credits
+- William Lin - linw10@rpi.edu - 4 credits
 
   
 
