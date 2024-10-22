@@ -88,6 +88,25 @@ async def get_chatgpt_response(query: str) -> str:
             else:
                 return f"Error {resp.status}: Unable to get a response from ChatGPT."
 
+async def get_chatgpt_response(query: str) -> str:
+    url = "https://api.openai.com/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {PyCordBot.GPT_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": "gpt-3.5-turbo",
+        "messages": [{"role": "user", "content": query}]
+    }
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, json=data, headers=headers) as resp:
+            if resp.status == 200:
+                result = await resp.json()
+                return result['choices'][0]['message']['content'].strip()
+            else:
+                return f"Error {resp.status}: Unable to get a response from ChatGPT."
+
 async def main_bot():
     print("Bot is starting...")
     await client.start(PyCordBot().TOKEN)
