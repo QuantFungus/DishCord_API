@@ -13,6 +13,8 @@ class PyCordBot(bridge.Bot):
     intents = discord.Intents.all()
 
 client = PyCordBot(intents=PyCordBot.intents, command_prefix="!")
+user_preferences = {}  # Store user preferences in-memory
+favorite_recipes = {}  # Store users' favorite recipes
 
 @client.listen()
 async def on_ready():
@@ -22,6 +24,17 @@ async def on_ready():
 async def ping(ctx):
     latency = (str(client.latency)).split('.')[1][1:3]
     await ctx.respond(f"Pong! Bot replied in {latency} ms")
+    
+@client.bridge_command(description="Setup user preferences")
+async def setup_preferences(ctx, flavor: str, dish: str, diet: str):
+    """Store user preferences for personalized suggestions."""
+    user_id = str(ctx.author.id)
+    user_preferences[user_id] = {
+        "flavor": flavor,
+        "favorite_dish": dish,
+        "diet": diet
+    }
+    await ctx.respond(f"Preferences saved! Flavor: {flavor}, Dish: {dish}, Diet: {diet}")
 
 @client.bridge_command(description="Ask a question to ChatGPT")
 async def ask(ctx, *, query: str):
