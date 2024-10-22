@@ -36,6 +36,33 @@ async def setup_preferences(ctx, flavor: str, dish: str, diet: str):
     }
     await ctx.respond(f"Preferences saved! Flavor: {flavor}, Dish: {dish}, Diet: {diet}")
 
+@client.bridge_command(description="Generate a recipe based on ingredients")
+async def recipe(ctx, *, ingredients: str):
+    """Generate a recipe using the provided ingredients."""
+    await ctx.defer()
+    query = f"Give me a recipe with the following ingredients: {ingredients}"
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
+@client.bridge_command(description="Save a recipe to your favorites")
+async def save_recipe(ctx, *, recipe: str):
+    """Save a recipe to the user's favorites."""
+    user_id = str(ctx.author.id)
+    if user_id not in favorite_recipes:
+        favorite_recipes[user_id] = []
+    favorite_recipes[user_id].append(recipe)
+    await ctx.respond(f"Recipe saved to your favorites!")
+
+@client.bridge_command(description="Show all your favorite recipes")
+async def show_favorites(ctx):
+    """Display all the favorite recipes of the user."""
+    user_id = str(ctx.author.id)
+    if user_id in favorite_recipes and favorite_recipes[user_id]:
+        recipes = "\n".join(favorite_recipes[user_id])
+        await ctx.respond(f"Your favorite recipes:\n{recipes}")
+    else:
+        await ctx.respond("You don't have any favorite recipes yet.")
+
 @client.bridge_command(description="Ask a question to ChatGPT")
 async def ask(ctx, *, query: str):
     await ctx.defer()  # Defer response to let users know the bot is working.
