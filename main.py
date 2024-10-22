@@ -4,17 +4,19 @@ import aiohttp
 import os
 from discord.ext import bridge
 from dotenv import load_dotenv
+from openai import OpenAI
 
 load_dotenv()
 
 class PyCordBot(bridge.Bot):
     TOKEN = os.getenv("DISCORD_TOKEN")
-    GPT_TOKEN = os.getenv("GPT_TOKEN")
     intents = discord.Intents.all()
 
 client = PyCordBot(intents=PyCordBot.intents, command_prefix="!")
 user_preferences = {}  # Store user preferences in-memory
 favorite_recipes = {}  # Store users' favorite recipes
+
+GPTclient = OpenAI(api_key=os.environ.get('GPT_TOKEN'))
 
 @client.listen()
 async def on_ready():
@@ -70,42 +72,16 @@ async def ask(ctx, *, query: str):
     await ctx.respond(response)
 
 async def get_chatgpt_response(query: str) -> str:
-    url = "https://api.openai.com/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {PyCordBot.GPT_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    data = {
-        "model": "gpt-3.5-turbo",
-        "messages": [{"role": "user", "content": query}]
-    }
+    
+    completion = GPTclient.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": query}
+        ]
+    )
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, json=data, headers=headers) as resp:
-            if resp.status == 200:
-                result = await resp.json()
-                return result['choices'][0]['message']['content'].strip()
-            else:
-                return f"Error {resp.status}: Unable to get a response from ChatGPT."
-
-async def get_chatgpt_response(query: str) -> str:
-    url = "https://api.openai.com/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {PyCordBot.GPT_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    data = {
-        "model": "gpt-3.5-turbo",
-        "messages": [{"role": "user", "content": query}]
-    }
-
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, json=data, headers=headers) as resp:
-            if resp.status == 200:
-                result = await resp.json()
-                return result['choices'][0]['message']['content'].strip()
-            else:
-                return f"Error {resp.status}: Unable to get a response from ChatGPT."
+    return completion.choices[0].message['content']
 
 async def main_bot():
     print("Bot is starting...")
