@@ -100,6 +100,24 @@ async def recipe_with_goal(ctx, ingredients: str, goal: str):
 
     response = await get_chatgpt_response(query)
     await ctx.respond(response)
+    
+@client.bridge_command(description="Generate a recipe with prep time")
+async def recipe_with_prep_time(ctx, ingredients: str, prep_time: int):
+    """Generate a recipe based on ingredients and desired preparation time."""
+    await ctx.defer()
+
+    # Validate preparation time
+    if prep_time <= 0:
+        await ctx.respond("Invalid prep time! Please provide a positive number.")
+        return
+
+    query = (
+        f"Give me a recipe with the following ingredients: {ingredients}. "
+        f"It should be prepared within {prep_time} minutes."
+    )
+
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
 
 async def main_bot():
     print("Bot is starting...")
