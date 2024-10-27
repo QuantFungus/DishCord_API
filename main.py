@@ -83,6 +83,24 @@ async def get_chatgpt_response(query: str) -> str:
 
     return completion.choices[0].message['content']
 
+@client.bridge_command(description="Generate a recipe based on ingredients and weight goal")
+async def recipe_with_goal(ctx, ingredients: str, goal: str):
+    """Generate a recipe using ingredients and weight management goal."""
+    await ctx.defer()
+
+    # Validate goal input
+    if goal.lower() not in ["gain", "lose", "maintain"]:
+        await ctx.respond("Invalid goal! Please choose from 'gain', 'lose', or 'maintain'.")
+        return
+
+    query = (
+        f"Give me a recipe with the following ingredients: {ingredients}. "
+        f"The user is trying to {goal} weight."
+    )
+
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
 async def main_bot():
     print("Bot is starting...")
     await client.start(PyCordBot().TOKEN)
