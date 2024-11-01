@@ -36,7 +36,7 @@ async def setup_preferences(ctx, flavor: str, dish: str, diet: str):
         "favorite_dish": dish,
         "diet": diet
     }
-    await ctx.respond(f"Preferences saved! Flavor: {flavor}, Dish: {dish}, Diet: {diet}")
+    await ctx.respond(f"Preferences saved! \n**Flavor:** {flavor}\n**Dish:** {dish}\n**Diet:** {diet}")
 
 @client.bridge_command(description="Display user preferences")
 async def display_preferences(ctx):
@@ -49,7 +49,7 @@ async def display_preferences(ctx):
     flavor: str = user_preferences[user_id]["flavor"]
     dish: str = user_preferences[user_id]["favorite_dish"]
     diet: str = user_preferences[user_id]["diet"]
-    await ctx.respond(f"Flavor: {flavor}, Dish: {dish}, Diet: {diet}")
+    await ctx.respond(f"Displaying preferences! \n**Flavor:** {flavor}\n**Dish:** {dish}\n**Diet:** {diet}")
 
 @client.bridge_command(description="Generate a recipe based on ingredients")
 async def recipe(ctx, *, ingredients: str):
