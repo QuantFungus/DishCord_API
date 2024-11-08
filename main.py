@@ -56,7 +56,7 @@ async def recipe(ctx, *, ingredients: str):
     """Generate a recipe using the provided ingredients."""
     await ctx.defer()
     query = f"Give me a recipe with the following ingredients: {ingredients}"
-    response = await get_chatgpt_response(query)
+    response = get_chatgpt_response(query)
     await ctx.respond(response)
 
 @client.bridge_command(description="Save a recipe to your favorites")
@@ -81,10 +81,10 @@ async def show_favorites(ctx):
 @client.bridge_command(description="Ask a question to ChatGPT")
 async def ask(ctx, *, query: str):
     await ctx.defer()  # Defer response to let users know the bot is working.
-    response = await get_chatgpt_response(query)
+    response = get_chatgpt_response(query)
     await ctx.respond(response)
 
-async def get_chatgpt_response(query: str) -> str:
+def get_chatgpt_response(query: str) -> str:
     
     completion = GPTclient.chat.completions.create(
         model="gpt-4o-mini",
@@ -94,7 +94,7 @@ async def get_chatgpt_response(query: str) -> str:
         ]
     )
 
-    return completion.choices[0].message['content']
+    return completion.choices[0].message.content
 
 async def main_bot():
     print("Bot is starting...")
