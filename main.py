@@ -118,6 +118,24 @@ async def recipe_with_prep_time(ctx, ingredients: str, prep_time: int):
 
     response = await get_chatgpt_response(query)
     await ctx.respond(response)
+    
+@client.bridge_command(description="Generate a diet-specific recipe")
+async def diet_recipe(ctx, diet_type: str, *, ingredients: str):
+    """Generate a recipe tailored to a specific diet type."""
+    await ctx.defer()
+
+    # Validate diet type input
+    valid_diets = ["vegetarian", "vegan", "keto", "paleo", "gluten-free"]
+    if diet_type.lower() not in valid_diets:
+        await ctx.respond("Invalid diet type! Choose from 'vegetarian', 'vegan', 'keto', 'paleo', or 'gluten-free'.")
+        return
+
+    query = (
+        f"Create a {diet_type} recipe using the following ingredients: {ingredients}. "
+        "Please ensure the recipe meets the dietary guidelines."
+    )
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
 
 async def main_bot():
     print("Bot is starting...")
