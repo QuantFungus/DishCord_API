@@ -137,6 +137,23 @@ async def diet_recipe(ctx, diet_type: str, *, ingredients: str):
     response = await get_chatgpt_response(query)
     await ctx.respond(response)
 
+@client.bridge_command(description="Generate a recipe with a calorie limit")
+async def recipe_with_calories(ctx, ingredients: str, max_calories: int):
+    """Generate a recipe based on ingredients and calorie limit."""
+    await ctx.defer()
+
+    # Validate calorie input
+    if max_calories <= 0:
+        await ctx.respond("Please provide a positive calorie limit.")
+        return
+
+    query = (
+        f"Give me a recipe with the following ingredients: {ingredients}. "
+        f"The recipe should have a maximum of {max_calories} calories."
+    )
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
 async def main_bot():
     print("Bot is starting...")
     await client.start(PyCordBot().TOKEN)
