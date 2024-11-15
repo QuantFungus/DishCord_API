@@ -154,6 +154,29 @@ async def recipe_with_calories(ctx, ingredients: str, max_calories: int):
     response = await get_chatgpt_response(query)
     await ctx.respond(response)
 
+@client.bridge_command(description="Generate a recipe with nutritional breakdown")
+async def recipe_with_nutrition(ctx, *, ingredients: str):
+    """Generate a recipe and include detailed nutritional information."""
+    await ctx.defer()
+
+    query = (
+        f"Generate a recipe using the following ingredients: {ingredients}. "
+        "Provide a detailed nutritional breakdown including calories, protein, fat, carbs, and other macros."
+    )
+
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
+@client.bridge_command(description="Fetch nutritional details of a single ingredient")
+async def ingredient_nutrition(ctx, *, ingredient: str):
+    """Fetch nutritional information of a single ingredient."""
+    await ctx.defer()
+
+    query = f"Provide the nutritional details for the ingredient: {ingredient}."
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
+
 async def main_bot():
     print("Bot is starting...")
     await client.start(PyCordBot().TOKEN)
