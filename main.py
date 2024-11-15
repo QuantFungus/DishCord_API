@@ -207,6 +207,38 @@ async def meal_prep_with_duration(ctx, ingredients: str, duration: int):
     response = await get_chatgpt_response(query)
     await ctx.respond(response)
 
+@client.bridge_command(description="Tag recipes with difficulty, flavors, and time")
+async def tag_recipe(ctx, recipe: str):
+    """Add tags to a recipe for better categorization."""
+    await ctx.defer()
+
+    query = (
+        f"Analyze the following recipe: {recipe}. "
+        "Provide tags such as difficulty level, predominant flavors, and estimated preparation time."
+    )
+
+    response = await get_chatgpt_response(query)
+    await ctx.respond(f"Recipe Tags:\n{response}")
+
+@client.bridge_command(description="Search recipes by tag")
+async def search_by_tag(ctx, *, tag: str):
+    """Search for favorite recipes by tag."""
+    user_id = str(ctx.author.id)
+    if user_id not in favorite_recipes or not favorite_recipes[user_id]:
+        await ctx.respond("You don't have any favorite recipes yet.")
+        return
+
+    matched_recipes = [
+        recipe for recipe in favorite_recipes[user_id] if tag.lower() in recipe.lower()
+    ]
+
+    if matched_recipes:
+        recipes = "\n".join(matched_recipes)
+        await ctx.respond(f"Recipes matching tag '{tag}':\n{recipes}")
+    else:
+        await ctx.respond(f"No recipes found with the tag '{tag}'.")
+
+
 async def main_bot():
     print("Bot is starting...")
     await client.start(PyCordBot().TOKEN)
