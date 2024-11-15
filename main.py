@@ -175,7 +175,37 @@ async def ingredient_nutrition(ctx, *, ingredient: str):
     query = f"Provide the nutritional details for the ingredient: {ingredient}."
     response = await get_chatgpt_response(query)
     await ctx.respond(response)
+    
+@client.bridge_command(description="Generate meal prep recipes")
+async def meal_prep(ctx, *, ingredients: str):
+    """Generate meal prep recipes for the week."""
+    await ctx.defer()
 
+    query = (
+        f"Create meal prep recipes using the following ingredients: {ingredients}. "
+        "The recipes should provide enough servings for a week's worth of meals, "
+        "include storage instructions, and be easy to reheat."
+    )
+
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
+@client.bridge_command(description="Generate a meal prep recipe for specific storage durations")
+async def meal_prep_with_duration(ctx, ingredients: str, duration: int):
+    """Generate meal prep recipes based on storage duration."""
+    await ctx.defer()
+
+    if duration <= 0:
+        await ctx.respond("Invalid storage duration! Please provide a positive number.")
+        return
+
+    query = (
+        f"Create meal prep recipes using the following ingredients: {ingredients}. "
+        f"The meals should last for {duration} days in storage."
+    )
+
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
 
 async def main_bot():
     print("Bot is starting...")
