@@ -15,6 +15,7 @@ class PyCordBot(bridge.Bot):
 client = PyCordBot(intents=PyCordBot.intents, command_prefix="!")
 user_preferences = {}  # Store user preferences in-memory
 favorite_recipes = {}  # Store users' favorite recipes
+last_message = {} # Stores last message for purpose of storing recipe
 
 GPTclient = OpenAI(api_key=os.environ.get('GPT_TOKEN'))
 
@@ -57,15 +58,17 @@ async def recipe(ctx, *, ingredients: str):
     await ctx.defer()
     query = f"Give me a recipe with the following ingredients: {ingredients}"
     response = get_chatgpt_response(query)
+    user_id = str(ctx.author.id)
+    last_message[user_id] = response
     await ctx.respond(response)
 
 @client.bridge_command(description="Save a recipe to your favorites")
-async def save_recipe(ctx, *, recipe: str):
+async def save_recipe(ctx):
     """Save a recipe to the user's favorites."""
     user_id = str(ctx.author.id)
     if user_id not in favorite_recipes:
         favorite_recipes[user_id] = []
-    favorite_recipes[user_id].append(recipe)
+    favorite_recipes[user_id].append(last_message[user_id])
     await ctx.respond(f"Recipe saved to your favorites!")
 
 @client.bridge_command(description="Show all your favorite recipes")
