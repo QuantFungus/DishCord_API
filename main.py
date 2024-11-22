@@ -238,6 +238,20 @@ async def search_by_tag(ctx, *, tag: str):
     else:
         await ctx.respond(f"No recipes found with the tag '{tag}'.")
 
+@client.bridge_command(description="Generate a weekly meal plan")
+async def weekly_meal_plan(ctx, *, ingredients: str):
+    """Generate a weekly meal plan based on ingredients."""
+    await ctx.defer()
+
+    query = (
+        f"Create a weekly meal plan using the following ingredients: {ingredients}. "
+        "Each meal should be unique, balanced, and meet general dietary guidelines. "
+        "Provide meal names and a brief description for each day of the week."
+    )
+
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
 
 async def main_bot():
     print("Bot is starting...")
