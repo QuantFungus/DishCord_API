@@ -252,6 +252,31 @@ async def weekly_meal_plan(ctx, *, ingredients: str):
     response = await get_chatgpt_response(query)
     await ctx.respond(response)
 
+@client.bridge_command(description="Rate a recipe in your favorites")
+async def rate_recipe(ctx, recipe_name: str, rating: int):
+    """Allow users to rate their favorite recipes."""
+    user_id = str(ctx.author.id)
+
+    if user_id not in favorite_recipes or not favorite_recipes[user_id]:
+        await ctx.respond("You don't have any favorite recipes to rate.")
+        return
+
+    # Validate rating
+    if rating < 1 or rating > 5:
+        await ctx.respond("Please provide a rating between 1 and 5.")
+        return
+
+    for recipe in favorite_recipes[user_id]:
+        if recipe_name in recipe:
+            if "ratings" not in recipe:
+                recipe["ratings"] = []
+            recipe["ratings"].append(rating)
+            avg_rating = sum(recipe["ratings"]) / len(recipe["ratings"])
+            await ctx.respond(f"Recipe '{recipe_name}' rated! Average Rating: {avg_rating:.2f}")
+            return
+
+    await ctx.respond(f"Recipe '{recipe_name}' not found in your favorites.")
+
 
 async def main_bot():
     print("Bot is starting...")
