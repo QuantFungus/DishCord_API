@@ -16,6 +16,7 @@ client = PyCordBot(intents=PyCordBot.intents, command_prefix="!")
 user_preferences = {}  # Store user preferences in-memory
 favorite_recipes = {}  # Store users' favorite recipes
 last_message = {} # Stores last message for purpose of storing recipe
+last_query = {} # Stores last query for purpose of storing recipe
 
 GPTclient = OpenAI(api_key=os.environ.get('GPT_TOKEN'))
 
@@ -59,8 +60,17 @@ async def recipe(ctx, *, ingredients: str):
     query = f"Give me a recipe with the following ingredients: {ingredients}"
     response = get_chatgpt_response(query)
     user_id = str(ctx.author.id)
+    last_query[user_id] = ingredients
     last_message[user_id] = response
-    await ctx.respond(response)
+    
+    # Check if the response exceeds Discord's character limit
+    if len(response) > 2000:
+        # Split the response into chunks
+        chunks = [response[i:i+2000] for i in range(0, len(response), 2000)]
+        for chunk in chunks:
+            await ctx.respond(chunk)
+    else:
+        await ctx.respond(response)
 
 @client.bridge_command(description="Save a recipe to your favorites")
 async def save_recipe(ctx):
@@ -68,7 +78,7 @@ async def save_recipe(ctx):
     user_id = str(ctx.author.id)
     if user_id not in favorite_recipes:
         favorite_recipes[user_id] = []
-    favorite_recipes[user_id].append(last_message[user_id])
+    favorite_recipes[user_id][last_query[user_id]] = last_message[user_id]
     await ctx.respond(f"Recipe saved to your favorites!")
 
 @client.bridge_command(description="Show all your favorite recipes")
@@ -76,7 +86,8 @@ async def show_favorites(ctx):
     """Display all the favorite recipes of the user."""
     user_id = str(ctx.author.id)
     if user_id in favorite_recipes and favorite_recipes[user_id]:
-        recipes = "\n".join(favorite_recipes[user_id])
+        print(favorite_recipes[user_id])
+        recipes = favorite_recipes[user_id].keys()
         await ctx.respond(f"Your favorite recipes:\n{recipes}")
     else:
         await ctx.respond("You don't have any favorite recipes yet.")
