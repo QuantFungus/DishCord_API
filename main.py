@@ -57,7 +57,25 @@ async def display_preferences(ctx):
 async def recipe(ctx, *, ingredients: str):
     """Generate a recipe using the provided ingredients."""
     await ctx.defer()
-    query = f"Give me a recipe with the following ingredients: {ingredients}"
+    query: str = f"Give me a recipe with the following ingredients: {ingredients}."
+
+    flavor: str = ""
+    dish: str = ""
+    diet: str = ""
+    user_id = str(ctx.author.id)
+    if user_id in user_preferences:
+        flavor: str = user_preferences[user_id]["flavor"]
+        dish: str = user_preferences[user_id]["favorite_dish"]
+        diet: str = user_preferences[user_id]["diet"]
+    query += f"""
+    If possible, include my personal preferences. Do not include them if they deviate too far from the
+    recipe. For example, if I like savory and bitter flavors but the recipe asks for sweet candy, it's
+    not necessary to include savory and bitter flavors.
+    Flavors: {flavor}
+    Dishes: {dish}
+    Diet: {diet}
+    """
+
     response = get_chatgpt_response(query)
     user_id = str(ctx.author.id)
     last_query[user_id] = ingredients
