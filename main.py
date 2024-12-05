@@ -433,6 +433,29 @@ async def shopping_list_categories(ctx):
     categories = ["Produce", "Dairy", "Meats", "Seafood", "Bakery", "Pantry", "Frozen"]
     await ctx.respond("Sample shopping list categories: " + ", ".join(categories))
 
+@client.bridge_command(description="Rewrite a given recipe's instructions with a chosen complexity")
+async def rewrite_instructions(ctx, complexity: str, *, recipe: str):
+    """
+    Rewrite the given recipe instructions.
+    complexity='simplify' to make them more beginner-friendly,
+    complexity='detail' to add more detailed steps and explanations.
+    """
+    await ctx.defer()
+    if complexity.lower() not in ["simplify", "detail"]:
+        await ctx.respond("Invalid complexity level! Choose 'simplify' or 'detail'.")
+        return
+    query = (
+        f"Rewrite the instructions of the following recipe: {recipe}. "
+        f"Please {complexity} the instructions to make it more suitable for the intended audience."
+    )
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
+@client.bridge_command(description="Show how to use rewrite_instructions command")
+async def rewrite_help(ctx):
+    """Explain how to use the rewrite_instructions command."""
+    await ctx.respond("Use '!rewrite_instructions simplify <recipe>' or '!rewrite_instructions detail <recipe>'.")
+
 async def main_bot():
     print("Bot is starting...")
     await client.start(PyCordBot().TOKEN)
