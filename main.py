@@ -409,6 +409,29 @@ async def ingredient_synonyms(ctx, *, ingredient: str):
     response = await get_chatgpt_response(query)
     await ctx.respond(response)
 
+@client.bridge_command(description="Generate a categorized shopping list from favorite recipes")
+async def categorized_shopping_list(ctx):
+    """Generate a categorized shopping list based on the user's favorite recipes."""
+    user_id = str(ctx.author.id)
+
+    if user_id not in favorite_recipes or not favorite_recipes[user_id]:
+        await ctx.respond("You don't have any favorite recipes to generate a shopping list from.")
+        return
+
+    query = (
+        "From the following recipes: "
+        f"{', '.join(favorite_recipes[user_id])}, "
+        "generate a shopping list categorized by sections (e.g., Produce, Dairy, Meats, Pantry). "
+        "List ingredients under their respective categories."
+    )
+    response = await get_chatgpt_response(query)
+    await ctx.respond(f"Here is your categorized shopping list:\n{response}")
+
+@client.bridge_command(description="Show a sample of categories used in shopping lists")
+async def shopping_list_categories(ctx):
+    """Display sample categories used in the categorized shopping list."""
+    categories = ["Produce", "Dairy", "Meats", "Seafood", "Bakery", "Pantry", "Frozen"]
+    await ctx.respond("Sample shopping list categories: " + ", ".join(categories))
 
 async def main_bot():
     print("Bot is starting...")
