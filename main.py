@@ -479,6 +479,29 @@ async def cost_saving_tips(ctx, *, recipe: str):
     response = await get_chatgpt_response(query)
     await ctx.respond(response)
 
+@client.bridge_command(description="Suggest a beverage pairing for a given recipe")
+async def beverage_pairing(ctx, *, recipe: str):
+    """Suggest a suitable beverage (wine, beer, non-alcoholic) to pair with the given recipe."""
+    await ctx.defer()
+    query = (
+        f"For the following recipe: {recipe}, "
+        "suggest a beverage pairing. Include reasoning behind the choice and possible alternatives."
+    )
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
+@client.bridge_command(description="Suggest non-alcoholic beverage pairings for a given recipe")
+async def non_alcoholic_pairing(ctx, *, recipe: str):
+    """Suggest non-alcoholic beverages to complement the given recipe."""
+    await ctx.defer()
+    query = (
+        f"For the following recipe: {recipe}, "
+        "suggest a non-alcoholic beverage pairing. Mention the flavor notes that match well."
+    )
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
+
 async def main_bot():
     print("Bot is starting...")
     await client.start(PyCordBot().TOKEN)
