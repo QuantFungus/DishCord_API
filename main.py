@@ -456,6 +456,29 @@ async def rewrite_help(ctx):
     """Explain how to use the rewrite_instructions command."""
     await ctx.respond("Use '!rewrite_instructions simplify <recipe>' or '!rewrite_instructions detail <recipe>'.")
 
+@client.bridge_command(description="Estimate the cost of a given recipe")
+async def estimate_cost(ctx, *, recipe: str):
+    """Estimate the approximate cost to prepare the given recipe."""
+    await ctx.defer()
+    query = (
+        f"Analyze the following recipe: {recipe}. "
+        "List the approximate cost of the ingredients and provide a total estimated cost. "
+        "Use general market prices and specify the currency (e.g., USD)."
+    )
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
+@client.bridge_command(description="Suggest cost-saving tips for a given recipe")
+async def cost_saving_tips(ctx, *, recipe: str):
+    """Suggest ways to reduce the cost of a given recipe."""
+    await ctx.defer()
+    query = (
+        f"Suggest cost-saving tips for the following recipe: {recipe}. "
+        "Include ingredient substitutions or buying in bulk."
+    )
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
 async def main_bot():
     print("Bot is starting...")
     await client.start(PyCordBot().TOKEN)
