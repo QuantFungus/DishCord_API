@@ -316,6 +316,27 @@ async def list_themes(ctx):
     formatted_themes = ", ".join(themes)
     await ctx.respond(f"Popular themes: {formatted_themes}")
 
+@client.bridge_command(description="Translate a given recipe into another language")
+async def translate_recipe(ctx, language: str, *, recipe: str):
+    """Translate the provided recipe text into the specified language (e.g., 'Spanish', 'French')."""
+    await ctx.defer()
+    query = (
+        f"Translate the following recipe into {language}: {recipe}. "
+        "Ensure that the cooking terms and ingredients are accurately translated."
+    )
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
+@client.bridge_command(description="List supported languages for translation")
+async def list_languages(ctx):
+    """List some languages supported for recipe translation."""
+    languages = [
+        "Spanish", "French", "German", "Italian", "Portuguese",
+        "Japanese", "Korean", "Chinese (Mandarin)", "Hindi"
+    ]
+    formatted_langs = ", ".join(languages)
+    await ctx.respond(f"Supported languages: {formatted_langs}")
+
 
 async def main_bot():
     print("Bot is starting...")
