@@ -364,6 +364,29 @@ async def persistent_preferences(ctx, flavor: str, dish: str, diet: str):
     }
     save_user_preferences()
     await ctx.respond(f"Preferences updated and saved!")
+    
+@client.bridge_command(description="Get cooking tips to improve your culinary skills")
+async def cooking_tips(ctx, skill_level: str):
+    """Provide cooking tips based on skill level ('beginner', 'intermediate', 'advanced')."""
+    await ctx.defer()
+    if skill_level.lower() not in ["beginner", "intermediate", "advanced"]:
+        await ctx.respond("Invalid skill level! Choose 'beginner', 'intermediate', or 'advanced'.")
+        return
+    query = (
+        f"Provide some cooking tips for a {skill_level} cook. "
+        "Focus on techniques, tools, and best practices to improve culinary skills."
+    )
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
+@client.bridge_command(description="Get a random general cooking tip")
+async def random_cooking_tip(ctx):
+    """Get a single random cooking tip."""
+    await ctx.defer()
+    query = "Give me one random cooking tip that can be useful to home cooks."
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
 
 async def main_bot():
     print("Bot is starting...")
