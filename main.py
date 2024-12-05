@@ -80,15 +80,6 @@ async def recipe(ctx, *, ingredients: str):
     user_id = str(ctx.author.id)
     last_query[user_id] = ingredients
     last_message[user_id] = response
-    
-    # Check if the response exceeds Discord's character limit
-    if len(response) > 2000:
-        # Split the response into chunks
-        chunks = [response[i:i+2000] for i in range(0, len(response), 2000)]
-        for chunk in chunks:
-            await ctx.respond(chunk)
-    else:
-        await ctx.respond(response)
 
 @client.bridge_command(description="Save a recipe to your favorites")
 async def save_recipe(ctx):
@@ -112,7 +103,6 @@ async def show_favorites(ctx):
 
 @client.bridge_command(description="Ask a question to ChatGPT")
 async def ask(ctx, *, query: str):
-    await ctx.defer()  # Defer response to let users know the bot is working.
     response = get_chatgpt_response(query)
     await ctx.respond(response)
 
