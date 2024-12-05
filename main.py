@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 PREF_FILE = "user_prefs.json"
+FEEDBACK_FILE = "user_feedback.log"
 
 load_dotenv()
 
@@ -37,6 +38,10 @@ user_preferences = load_user_preferences()
 
 async def on_ready():
     print(f"Logged in as {client.user.name}")
+
+def log_feedback(user_id: str, feedback: str):
+    with open(FEEDBACK_FILE, "a") as f:
+        f.write(f"User: {user_id}, Feedback: {feedback}\n")
 
 @client.bridge_command(description="Ping, pong!")
 async def ping(ctx):
@@ -501,6 +506,32 @@ async def non_alcoholic_pairing(ctx, *, recipe: str):
     response = await get_chatgpt_response(query)
     await ctx.respond(response)
 
+@client.bridge_command(description="Submit feedback for the bot or recipes")
+async def submit_feedback(ctx, *, feedback: str):
+    """Allows users to submit feedback which is logged locally."""
+    user_id = str(ctx.author.id)
+    log_feedback(user_id, feedback)
+    await ctx.respond("Thank you for your feedback! It has been recorded.")
+
+@client.bridge_command(description="Show a summary of recent feedback (Admin only)")
+async def show_feedback(ctx, limit: int = 5):
+    """Show the most recent feedback entries. Admin only."""
+    # This is a mock admin check. In a real scenario, check roles or IDs.
+    if str(ctx.author.id) != "YOUR_ADMIN_USER_ID_HERE":
+        await ctx.respond("You are not authorized to view feedback.")
+        return
+
+    if os.path.exists(FEEDBACK_FILE):
+        with open(FEEDBACK_FILE, "r") as f:
+            lines = f.readlines()
+        recent_feedback = lines[-limit:] if len(lines) > 0 else []
+        if recent_feedback:
+            formatted = "".join(recent_feedback)
+            await ctx.respond(f"Recent feedback:\n{formatted}")
+        else:
+            await ctx.respond("No feedback recorded yet.")
+    else:
+        await ctx.respond("No feedback file found.")
 
 async def main_bot():
     print("Bot is starting...")
