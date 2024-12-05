@@ -295,6 +295,27 @@ async def generate_shopping_list(ctx):
     response = await get_chatgpt_response(query)
     await ctx.respond(f"Here is your shopping list:\n{response}")
 
+@client.bridge_command(description="Suggest a random themed recipe")
+async def random_recipe(ctx, theme: str):
+    """Suggest a random recipe based on a given theme (e.g., 'Italian', 'Dessert', 'Comfort Food')."""
+    await ctx.defer()
+    query = (
+        f"Suggest a random {theme} recipe. "
+        "Provide a short description and the key ingredients."
+    )
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
+@client.bridge_command(description="List popular recipe themes")
+async def list_themes(ctx):
+    """List some popular recipe themes for inspiration."""
+    themes = [
+        "Italian", "Mexican", "Thai", "Chinese", "Mediterranean",
+        "Dessert", "Vegan Brunch", "Comfort Food", "Holiday Special"
+    ]
+    formatted_themes = ", ".join(themes)
+    await ctx.respond(f"Popular themes: {formatted_themes}")
+
 
 async def main_bot():
     print("Bot is starting...")
