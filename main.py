@@ -387,6 +387,28 @@ async def random_cooking_tip(ctx):
     response = await get_chatgpt_response(query)
     await ctx.respond(response)
 
+@client.bridge_command(description="Find alternatives for a given ingredient")
+async def ingredient_alternatives(ctx, *, ingredient: str):
+    """Suggest alternative ingredients or synonyms that can be used in a recipe."""
+    await ctx.defer()
+    query = (
+        f"Suggest alternatives or substitutes for {ingredient}. "
+        "Include flavor profile and how they impact the recipe."
+    )
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
+@client.bridge_command(description="Get synonyms for an ingredient")
+async def ingredient_synonyms(ctx, *, ingredient: str):
+    """Provide synonyms or different names of a given ingredient (useful for global recipes)."""
+    await ctx.defer()
+    query = (
+        f"List synonyms or regional names for the ingredient: {ingredient}. "
+        "Note any differences in usage or flavor."
+    )
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
 
 async def main_bot():
     print("Bot is starting...")
