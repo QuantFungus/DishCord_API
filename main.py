@@ -2,9 +2,12 @@ import discord
 import asyncio
 import aiohttp
 import os
+import json
 from discord.ext import bridge
 from dotenv import load_dotenv
 from openai import OpenAI
+
+PREF_FILE = "user_prefs.json"
 
 load_dotenv()
 
@@ -19,6 +22,19 @@ favorite_recipes = {}  # Store users' favorite recipes
 GPTclient = OpenAI(api_key=os.environ.get('GPT_TOKEN'))
 
 @client.listen()
+
+def load_user_preferences():
+    if os.path.exists(PREF_FILE):
+        with open(PREF_FILE, "r") as f:
+            return json.load(f)
+    return {}
+
+def save_user_preferences():
+    with open(PREF_FILE, "w") as f:
+        json.dump(user_preferences, f)
+
+user_preferences = load_user_preferences()
+
 async def on_ready():
     print(f"Logged in as {client.user.name}")
 
@@ -337,6 +353,17 @@ async def list_languages(ctx):
     formatted_langs = ", ".join(languages)
     await ctx.respond(f"Supported languages: {formatted_langs}")
 
+@client.bridge_command(description="Update preferences and save them persistently")
+async def persistent_preferences(ctx, flavor: str, dish: str, diet: str):
+    """Update preferences and save them to a JSON file for persistence."""
+    user_id = str(ctx.author.id)
+    user_preferences[user_id] = {
+        "flavor": flavor,
+        "favorite_dish": dish,
+        "diet": diet
+    }
+    save_user_preferences()
+    await ctx.respond(f"Preferences updated and saved!")
 
 async def main_bot():
     print("Bot is starting...")
