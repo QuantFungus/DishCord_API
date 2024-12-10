@@ -2,7 +2,7 @@ import discord
 import asyncio
 import aiohttp
 import os
-from discord.ext import bridge
+from discord.ext import bridge, commands
 from dotenv import load_dotenv
 from openai import OpenAI
 
@@ -11,6 +11,21 @@ load_dotenv()
 class PyCordBot(bridge.Bot):
     TOKEN = os.getenv("DISCORD_TOKEN")
     intents = discord.Intents.all()
+
+bot = commands.Bot(command_prefix='/')
+
+@bot.event
+async def on_ready():
+    print(f'Logged in as {bot.user}')
+
+@bot.command()
+async def set_preferences(ctx, flavor: str, dietary_restrictions: str):
+    if not flavor or not dietary_restrictions:
+        await ctx.send("Please provide valid flavor and dietary restriction inputs.")
+        return
+    await ctx.send(f"Preferences saved: Flavor - {flavor}, Dietary Restrictions - {dietary_restrictions}")
+
+bot.run('YOUR_DISCORD_TOKEN')
 
 client = PyCordBot(intents=PyCordBot.intents, command_prefix="!")
 user_preferences = {}  # Store user preferences in-memory
