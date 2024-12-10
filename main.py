@@ -85,6 +85,10 @@ async def recipe(ctx, *, ingredients: str):
 async def save_recipe(ctx):
     """Save a recipe to the user's favorites."""
     user_id = str(ctx.author.id)
+
+    if user_id not in last_message:
+        await ctx.respond("No previously generated recipe!")
+
     if user_id not in favorite_recipes:
         favorite_recipes[user_id] = []
     favorite_recipes[user_id][last_query[user_id]] = last_message[user_id]
