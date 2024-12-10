@@ -1,6 +1,7 @@
 import discord
 import asyncio
 import os
+import random
 from discord.ext import bridge, commands
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -33,6 +34,20 @@ last_message = {} # Stores last message for purpose of storing recipe
 last_query = {} # Stores last query for purpose of storing recipe
 
 GPTclient = OpenAI(api_key=os.environ.get('GPT_TOKEN'))
+
+def generate_recipe_test(ingredients):
+    tags = ["easy", "spicy", "quick", "low-calorie"]
+    recipe = f"Recipe using {', '.join(ingredients)}: Delicious Dish"
+    tag = random.choice(tags)
+    return f"{recipe} (Tag: {tag})"
+
+@bot.command_test()
+async def recipe(ctx, *ingredients):
+    if not ingredients:
+        await ctx.send("Please provide ingredients.")
+        return
+    recipe = generate_recipe_test(ingredients)
+    await ctx.send(recipe)
 
 @client.listen()
 async def on_ready():
