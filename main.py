@@ -1,6 +1,5 @@
 import discord
 import asyncio
-import aiohttp
 import os
 from discord.ext import bridge, commands
 from dotenv import load_dotenv
