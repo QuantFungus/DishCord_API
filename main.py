@@ -41,6 +41,11 @@ def generate_recipe_test(ingredients):
     tag = random.choice(tags)
     return f"{recipe} (Tag: {tag})"
 
+def generate_recipe_with_nutrition(ingredients):
+    nutrition = {"calories": 250, "protein": 15, "carbs": 30, "fat": 10}
+    recipe = generate_recipe_test(ingredients)
+    return f"{recipe}\nNutrition: {nutrition}"
+
 @bot.command_test()
 async def recipe(ctx, *ingredients):
     if not ingredients:
