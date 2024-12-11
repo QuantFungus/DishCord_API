@@ -68,7 +68,17 @@ async def on_ready():
 async def ping(ctx):
     latency = (str(client.latency)).split('.')[1][1:3]
     await ctx.respond(f"Pong! Bot replied in {latency} ms")
-    
+
+@client.bridge_command(description="Displays commands DishCord bot is capable of")
+async def help(ctx):
+    commands = """
+    /setup_preferences <flavor> <dish> <diet> - Set your preferences.
+    /recipe <ingredients> [--quick] [--meal_prep] - Generate a recipe.
+    /save_recipe - Save the most recent recipe to your favorites.
+    /show_favorites - Display all saved recipes.
+    """
+    await ctx.respond(commands)
+
 @client.bridge_command(description="Setup user preferences")
 async def setup_preferences(ctx, flavor: str, dish: str, diet: str):
     """Store user preferences for personalized suggestions."""
