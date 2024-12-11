@@ -2,9 +2,12 @@ import discord
 import asyncio
 import os
 import random
+import logging
 from discord.ext import bridge, commands
 from dotenv import load_dotenv
 from openai import OpenAI
+
+logging.basicConfig(level=logging.INFO)
 
 load_dotenv()
 
@@ -51,6 +54,11 @@ def generate_recipe_with_nutrition(ingredients):
     nutrition = {"calories": 250, "protein": 15, "carbs": 30, "fat": 10}
     recipe = generate_recipe_test(ingredients)
     return f"{recipe}\nNutrition: {nutrition}"
+
+@bot.event
+async def on_command_error(ctx, error):
+    logging.error(f"Error in command {ctx.command}: {error}")
+    await ctx.send("An error occurred while processing your command.")
 
 @bot.command_test()
 async def recipe(ctx, *ingredients):
