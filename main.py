@@ -3,9 +3,11 @@ import asyncio
 import aiohttp
 import os
 import json
+import time
 from discord.ext import bridge
 from dotenv import load_dotenv
 from openai import OpenAI
+from functools import lru_cache
 
 PREF_FILE = "user_prefs.json"
 FEEDBACK_FILE = "user_feedback.log"
@@ -24,6 +26,24 @@ GPTclient = OpenAI(api_key=os.environ.get('GPT_TOKEN'))
 
 @client.listen()
 
+@lru_cache(maxsize=50)
+def cached_chatgpt_response(query: str):
+    """Caches responses to improve performance"""
+    start_time = time.time()
+    
+    completion = GPTclient.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": query}
+        ]
+    )
+    
+    elapsed_time = round(time.time() - start_time, 2)
+    print(f"Response time: {elapsed_time}s")  # ✅ Log response time
+    
+    return completion.choices[0].message['content']
+
 def load_user_preferences():
     if os.path.exists(PREF_FILE):
         with open(PREF_FILE, "r") as f:
@@ -36,6 +56,7 @@ def save_user_preferences():
 
 user_preferences = load_user_preferences()
 
+@client.event
 async def on_ready():
     print(f"Logged in as {client.user.name}")
 
