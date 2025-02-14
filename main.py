@@ -3,6 +3,7 @@ import asyncio
 import os
 import random
 import logging
+import textwrap
 from discord.ext import bridge, commands
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -50,13 +51,13 @@ async def ping(ctx):
     await ctx.respond(f"Pong! Bot replied in {latency} ms")
 
 @client.bridge_command(description="Displays commands DishCord bot is capable of")
-async def help(ctx):
-    commands = """
+async def options(ctx):
+    commands = textwrap.dedent("""
     /setup_preferences <flavor> <dish> <diet> - Set your preferences.
     /recipe <ingredients> [--quick] [--meal_prep] - Generate a recipe.
     /save_recipe - Save the most recent recipe to your favorites.
     /show_favorites - Display all saved recipes.
-    """
+    """)
     await ctx.respond(commands)
 
 @client.bridge_command(description="Setup user preferences")
