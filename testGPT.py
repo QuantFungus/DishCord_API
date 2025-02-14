@@ -1,3 +1,5 @@
+# Just here to test the env variable for your GPT_TOKEN which should return a haiku
+
 from openai import OpenAI
 import os
 

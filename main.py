@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO)
 load_dotenv()
 
 class PyCordBot(bridge.Bot):
-    TOKEN = os.getenv("DISCORD_TOKEN")
+    TOKEN = str(os.getenv("DISCORD_TOKEN"))
     intents = discord.Intents.all()
 
 bot = commands.Bot(command_prefix='/')
