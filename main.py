@@ -15,21 +15,6 @@ class PyCordBot(bridge.Bot):
     TOKEN = str(os.getenv("DISCORD_TOKEN"))
     intents = discord.Intents.all()
 
-bot = commands.Bot(command_prefix='/')
-
-@bot.event
-async def on_ready():
-    print(f'Logged in as {bot.user}')
-
-@bot.command()
-async def set_preferences(ctx, flavor: str, dietary_restrictions: str):
-    if not flavor or not dietary_restrictions:
-        await ctx.send("Please provide valid flavor and dietary restriction inputs.")
-        return
-    await ctx.send(f"Preferences saved: Flavor - {flavor}, Dietary Restrictions - {dietary_restrictions}")
-
-bot.run('YOUR_DISCORD_TOKEN')
-
 client = PyCordBot(intents=PyCordBot.intents, command_prefix="!")
 user_preferences = {}  # Store user preferences in-memory
 favorite_recipes = {}  # Store users' favorite recipes
@@ -54,19 +39,6 @@ def generate_recipe_with_nutrition(ingredients):
     nutrition = {"calories": 250, "protein": 15, "carbs": 30, "fat": 10}
     recipe = generate_recipe_test(ingredients)
     return f"{recipe}\nNutrition: {nutrition}"
-
-@bot.event
-async def on_command_error(ctx, error):
-    logging.error(f"Error in command {ctx.command}: {error}")
-    await ctx.send("An error occurred while processing your command.")
-
-@bot.command_test()
-async def recipe(ctx, *ingredients):
-    if not ingredients:
-        await ctx.send("Please provide ingredients.")
-        return
-    recipe = generate_recipe_test(ingredients)
-    await ctx.send(recipe)
 
 @client.listen()
 async def on_ready():
