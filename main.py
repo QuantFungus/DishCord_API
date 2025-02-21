@@ -79,7 +79,25 @@ async def setup_preferences(ctx, flavor: str, dish: str, diet: str):
         "diet": diet
     }
     await ctx.respond(f"Preferences saved! Flavor: {flavor}, Dish: {dish}, Diet: {diet}")
-    
+
+@client.bridge_command(description="Generate a shopping list from your favorite recipes")
+async def generate_shopping_list(ctx):
+    """Generate a shopping list based on user's favorite recipes."""
+    user_id = str(ctx.author.id)
+
+    if user_id not in favorite_recipes or not favorite_recipes[user_id]:
+        await ctx.respond("You don't have any favorite recipes to generate a shopping list from.")
+        return
+
+    query = (
+        "Generate a comprehensive shopping list from the following recipes: "
+        f"{', '.join(favorite_recipes[user_id])}. "
+        "List the ingredients in quantities for a week's worth of meals."
+    )
+
+    response = await get_chatgpt_response(query)
+    await ctx.respond(f"Here is your shopping list:\n{response}")
+
 @client.bridge_command(description="Rate a recipe in your favorites")
 async def rate_recipe(ctx, recipe_name: str, rating: int):
     """Allow users to rate their favorite recipes."""
