@@ -19,8 +19,8 @@ class PyCordBot(bridge.Bot):
 client = PyCordBot(intents=PyCordBot.intents, command_prefix="!")
 user_preferences = {}  # Store user preferences in-memory
 favorite_recipes = {}  # Store users' favorite recipes
-last_message = {} # Stores last message for purpose of storing recipe
-last_query = {} # Stores last query for purpose of storing recipe
+last_message = {}  # Stores last message for purpose of storing recipe
+last_query = {}  # Stores last query for purpose of storing recipe
 
 GPTclient = OpenAI(api_key=os.environ.get('GPT_TOKEN'))
 
@@ -108,9 +108,15 @@ async def recipe(ctx, *, ingredients: str):
     """
 
     response = get_chatgpt_response(query)
+
+    # Save message history
     user_id = str(ctx.author.id)
     last_query[user_id] = ingredients
     last_message[user_id] = response
+
+    # Split response into chunks of 2000 characters
+    for i in range(0, len(response), 2000):
+        await ctx.send(response[i:i+2000])
 
 @client.bridge_command(description="Save a recipe to your favorites")
 async def save_recipe(ctx):
@@ -138,8 +144,12 @@ async def show_favorites(ctx):
 
 @client.bridge_command(description="Ask a question to ChatGPT")
 async def ask(ctx, *, query: str):
+    await ctx.defer()  # Defer the response to avoid interaction expiration
     response = get_chatgpt_response(query)
-    await ctx.respond(response)
+    
+    # Split response into chunks of 2000 characters
+    for i in range(0, len(response), 2000):
+        await ctx.send(response[i:i+2000])
 
 def get_chatgpt_response(query: str) -> str:
     
