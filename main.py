@@ -24,23 +24,6 @@ last_query = {}  # Stores last query for purpose of storing recipe
 
 GPTclient = OpenAI(api_key=os.environ.get('GPT_TOKEN'))
 
-def generate_recipe_test(ingredients):
-    tags = ["easy", "spicy", "quick", "low-calorie"]
-    recipe = f"Recipe using {', '.join(ingredients)}: Delicious Dish"
-    tag = random.choice(tags)
-    return f"{recipe} (Tag: {tag})"
-
-def generate_recipe_test(ingredients, quick: bool = False):
-    tags = ["easy", "spicy", "low-calorie"]
-    if quick: tags.append("quick")
-    recipe = f"Recipe using {', '.join(ingredients)}: Delicious Dish"
-    return f"{recipe} (Tag: {', '.join(tags)})"
-
-def generate_recipe_with_nutrition(ingredients):
-    nutrition = {"calories": 250, "protein": 15, "carbs": 30, "fat": 10}
-    recipe = generate_recipe_test(ingredients)
-    return f"{recipe}\nNutrition: {nutrition}"
-
 @client.listen()
 async def on_ready():
     print(f"Logged in as {client.user.name}")
