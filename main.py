@@ -79,6 +79,31 @@ async def setup_preferences(ctx, flavor: str, dish: str, diet: str):
         "diet": diet
     }
     await ctx.respond(f"Preferences saved! Flavor: {flavor}, Dish: {dish}, Diet: {diet}")
+    
+@client.bridge_command(description="Rate a recipe in your favorites")
+async def rate_recipe(ctx, recipe_name: str, rating: int):
+    """Allow users to rate their favorite recipes."""
+    user_id = str(ctx.author.id)
+
+    if user_id not in favorite_recipes or not favorite_recipes[user_id]:
+        await ctx.respond("You don't have any favorite recipes to rate.")
+        return
+
+    # Validate rating
+    if rating < 1 or rating > 5:
+        await ctx.respond("Please provide a rating between 1 and 5.")
+        return
+
+    for recipe in favorite_recipes[user_id]:
+        if recipe_name in recipe:
+            if "ratings" not in recipe:
+                recipe["ratings"] = []
+            recipe["ratings"].append(rating)
+            avg_rating = sum(recipe["ratings"]) / len(recipe["ratings"])
+            await ctx.respond(f"Recipe '{recipe_name}' rated! Average Rating: {avg_rating:.2f}")
+            return
+
+    await ctx.respond(f"Recipe '{recipe_name}' not found in your favorites.")
 
 @client.bridge_command(description="Generate a recipe based on ingredients")
 async def recipe(ctx, *, ingredients: str):
