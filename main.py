@@ -619,6 +619,22 @@ async def show_feedback(ctx, limit: int = 5):
     else:
         await ctx.respond("No feedback file found.")
 
+@client.bridge_command(description="Remove a recipe from your favorites")
+async def remove_recipe(ctx, *, recipe_name: str):
+    """Remove a recipe from the user's favorites."""
+    user_id = str(ctx.author.id)
+
+    if user_id not in favorite_recipes or not favorite_recipes[user_id]:
+        await ctx.respond("You don't have any favorite recipes.")
+        return
+
+    if recipe_name in favorite_recipes[user_id]:
+        favorite_recipes[user_id].remove(recipe_name)
+        save_favorite_recipes()
+        await ctx.respond(f"Recipe '{recipe_name}' has been removed from your favorites.")
+    else:
+        await ctx.respond(f"Recipe '{recipe_name}' not found in your favorites.")
+
 async def main_bot():
     print("Bot is starting...")
     await client.start(PyCordBot().TOKEN)
