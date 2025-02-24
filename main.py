@@ -594,6 +594,23 @@ async def beverage_pairing(ctx, *, recipe: str):
     )
     response = await get_chatgpt_response(query)
     await ctx.respond(response)
+    
+@client.bridge_command(description="Search your saved recipes by ingredient")
+async def search_by_ingredient(ctx, *, ingredient: str):
+    """Find favorite recipes containing a specific ingredient."""
+    user_id = str(ctx.author.id)
+
+    if user_id not in favorite_recipes or not favorite_recipes[user_id]:
+        await ctx.respond("You don't have any favorite recipes.")
+        return
+
+    matching_recipes = [recipe for recipe in favorite_recipes[user_id] if ingredient.lower() in recipe.lower()]
+    
+    if matching_recipes:
+        await ctx.respond(f"Recipes containing '{ingredient}':\n" + "\n".join(matching_recipes))
+    else:
+        await ctx.respond(f"No recipes found containing '{ingredient}'.")
+
 
 @client.bridge_command(description="Suggest non-alcoholic beverage pairings for a given recipe")
 async def non_alcoholic_pairing(ctx, *, recipe: str):
