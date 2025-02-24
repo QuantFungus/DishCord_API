@@ -524,6 +524,20 @@ async def shopping_list_categories(ctx):
     categories = ["Produce", "Dairy", "Meats", "Seafood", "Bakery", "Pantry", "Frozen"]
     await ctx.respond("Sample shopping list categories: " + ", ".join(categories))
 
+@client.bridge_command(description="Save all recipes from a meal plan")
+async def save_meal_plan(ctx, *, meal_plan: str):
+    """Save all meal plan recipes to the user's favorites."""
+    user_id = str(ctx.author.id)
+
+    if user_id not in favorite_recipes:
+        favorite_recipes[user_id] = []
+
+    recipes = meal_plan.split("\n")  # Assume meal plan lists recipes line by line
+    favorite_recipes[user_id].extend(recipes)
+    save_favorite_recipes()
+    
+    await ctx.respond(f"All meal plan recipes have been saved to your favorites!")
+
 @client.bridge_command(description="Rewrite a given recipe's instructions with a chosen complexity")
 async def rewrite_instructions(ctx, complexity: str, *, recipe: str):
     """
