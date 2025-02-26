@@ -4,10 +4,10 @@ import os
 import random
 import logging
 import textwrap
+import re
 from discord.ext import bridge, commands
 from dotenv import load_dotenv
 from openai import OpenAI
-import re
 
 logging.basicConfig(level=logging.INFO)
 
@@ -26,36 +26,32 @@ last_query = {}  # Stores last query for purpose of storing recipe
 GPTclient = OpenAI(api_key=os.environ.get('GPT_TOKEN'))
 
 # Helper Functions
-def split_into_sentences(text: str):
+def chunk_by_lines(text: str, max_size: int = 2000):
     """
-    Splits the text into sentences based on '.', '?', or '!'
-    followed by whitespace or the end of the string.
+    Splits the text into chunks of up to `max_size` characters
+    without breaking any line in the middle (unless a single
+    line itself exceeds `max_size`).
     """
-    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
-    return sentences
-
-def chunk_text_by_sentence(text: str, chunk_size: int = 2000):
-    """
-    Splits text into chunks of no more than `chunk_size` characters,
-    ensuring we do not break any sentences.
-    """
-    sentences = split_into_sentences(text)
+    lines = text.split('\n')
     chunks = []
     current_chunk = ""
 
-    for sentence in sentences:
-        # If adding this sentence to current_chunk exceeds the limit, push current_chunk to chunks and start a new one.
-        if len(current_chunk) + len(sentence) + 1 > chunk_size:
-            chunks.append(current_chunk.strip())
-            current_chunk = sentence
-        else:
+    for line in lines:
+        while len(line) > max_size:
+            chunks.append(line[:max_size])
+            line = line[max_size:]
+
+        if len(current_chunk) + len(line) + 1 <= max_size:
             if not current_chunk:
-                current_chunk = sentence
+                current_chunk = line  # first line in the chunk
             else:
-                current_chunk += " " + sentence
+                current_chunk += "\n" + line
+        else:
+            chunks.append(current_chunk)
+            current_chunk = line
 
     if current_chunk:
-        chunks.append(current_chunk.strip())
+        chunks.append(current_chunk)
 
     return chunks
 
@@ -88,7 +84,7 @@ async def setup_preferences(ctx, flavor: str, dish: str, diet: str):
         "diet": diet
     }
     await ctx.respond(
-        f"Preferences saved! \n**Flavor:** {flavor}\n**Dish:** {dish}\n**Diet:** {diet}"
+        f"Preferences saved!\n**Flavor:** {flavor}\n**Dish:** {dish}\n**Diet:** {diet}"
     )
 
 @client.bridge_command(description="Display user preferences")
@@ -100,22 +96,22 @@ async def display_preferences(ctx):
         await ctx.respond("You don't have any preferences yet.")
         return
 
-    flavor: str = user_preferences[user_id]["flavor"]
-    dish: str = user_preferences[user_id]["favorite_dish"]
-    diet: str = user_preferences[user_id]["diet"]
+    flavor = user_preferences[user_id]["flavor"]
+    dish = user_preferences[user_id]["favorite_dish"]
+    diet = user_preferences[user_id]["diet"]
     await ctx.respond(
-        f"Displaying preferences! \n**Flavor:** {flavor}\n**Dish:** {dish}\n**Diet:** {diet}"
+        f"Displaying preferences!\n**Flavor:** {flavor}\n**Dish:** {dish}\n**Diet:** {diet}"
     )
 
 @client.bridge_command(description="Generate a recipe based on ingredients")
 async def recipe(ctx, *, ingredients: str):
     """Generate a recipe using the provided ingredients."""
     await ctx.defer()
-    query: str = f"Give me a recipe with the following ingredients: {ingredients}."
+    query = f"Give me a recipe with the following ingredients: {ingredients}."
 
-    flavor: str = ""
-    dish: str = ""
-    diet: str = ""
+    flavor = ""
+    dish = ""
+    diet = ""
     user_id = str(ctx.author.id)
     if user_id in user_preferences:
         flavor = user_preferences[user_id]["flavor"]
@@ -137,7 +133,7 @@ async def recipe(ctx, *, ingredients: str):
     last_query[user_id] = ingredients
     last_message[user_id] = response
 
-    chunks = chunk_text_by_sentence(response, 2000)
+    chunks = chunk_by_lines(response, 2000)
     for chunk in chunks:
         await ctx.send(chunk)
 
@@ -169,10 +165,10 @@ async def show_favorites(ctx):
 
 @client.bridge_command(description="Ask a question to ChatGPT")
 async def ask(ctx, *, query: str):
-    await ctx.defer()  # Defer the response to avoid interaction expiration
+    await ctx.defer()
     response = get_chatgpt_response(query)
 
-    chunks = chunk_text_by_sentence(response, 2000)
+    chunks = chunk_by_lines(response, 2000)
     for chunk in chunks:
         await ctx.send(chunk)
 
