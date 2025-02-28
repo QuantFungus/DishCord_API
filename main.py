@@ -21,6 +21,7 @@ user_preferences = {}  # Store user preferences in-memory
 favorite_recipes = {}  # Store users' favorite recipes
 last_message = {}  # Stores last message for purpose of storing recipe
 last_query = {}  # Stores last query for purpose of storing recipe
+name = {} # Just here for testing
 
 GPTclient = OpenAI(api_key=os.environ.get('GPT_TOKEN'))
 
@@ -119,11 +120,29 @@ async def show_favorites(ctx):
     """Display all the favorite recipes of the user."""
     user_id = str(ctx.author.id)
     if user_id in favorite_recipes and favorite_recipes[user_id]:
-        print(favorite_recipes[user_id])
         recipes = favorite_recipes[user_id].keys()
         await ctx.respond(f"Your favorite recipes:\n{recipes}")
     else:
         await ctx.respond("You don't have any favorite recipes yet.")
+
+@client.bridge_command(description="nametest")
+async def nametest(ctx):
+    """dev cmd for testing local storage."""
+    user_id = str(ctx.author.id)
+    if user_id in name:
+        await ctx.respond(f"Your 'name' is: {name[user_id]}.")
+    else:
+        await ctx.respond("Sorry, but there's no 'name' in the system! Please type your name in the chat.")
+
+        def check(message):
+            return message.author == ctx.author and message.channel == ctx.channel
+
+        try:
+            msg = await client.wait_for("message", timeout=30.0, check=check)  # Wait for user input
+            name[user_id] = msg.content  # Save name
+            await ctx.send(f"Thanks! Your 'name' has been set to: {name[user_id]}.")
+        except asyncio.TimeoutError:
+            await ctx.send("You took too long to respond! Try again.")
 
 @client.bridge_command(description="Ask a question to ChatGPT")
 async def ask(ctx, *, query: str):
