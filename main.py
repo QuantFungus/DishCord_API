@@ -644,6 +644,26 @@ async def share_recipe(ctx, user: discord.Member, *, recipe_name: str):
     else:
         await ctx.respond(f"Recipe '{recipe_name}' not found in your favorites.")
 
+recipe_tags = {}  # Dictionary to store recipe tags
+
+@client.bridge_command(description="Tag a saved recipe for better organization")
+async def tag_recipe(ctx, recipe_name: str, tag: str):
+    """Allow users to add custom tags to saved recipes."""
+    user_id = str(ctx.author.id)
+
+    if user_id not in favorite_recipes or recipe_name not in favorite_recipes[user_id]:
+        await ctx.respond(f"Recipe '{recipe_name}' not found in your favorites.")
+        return
+
+    if user_id not in recipe_tags:
+        recipe_tags[user_id] = {}
+
+    if recipe_name not in recipe_tags[user_id]:
+        recipe_tags[user_id][recipe_name] = []
+
+    recipe_tags[user_id][recipe_name].append(tag)
+    await ctx.respond(f"Tagged '{recipe_name}' with '{tag}'.")
+
 @client.bridge_command(description="Suggest non-alcoholic beverage pairings for a given recipe")
 async def non_alcoholic_pairing(ctx, *, recipe: str):
     """Suggest non-alcoholic beverages to complement the given recipe."""
