@@ -629,6 +629,20 @@ async def favorite_meal_plan(ctx):
     response = await get_chatgpt_response(query)
     await ctx.respond(f"Here is your personalized meal plan:\n{response}")
 
+@client.bridge_command(description="Share a saved recipe with another user")
+async def share_recipe(ctx, user: discord.Member, *, recipe_name: str):
+    """Share a saved recipe with another Discord user."""
+    sender_id = str(ctx.author.id)
+
+    if sender_id not in favorite_recipes or not favorite_recipes[sender_id]:
+        await ctx.respond("You don't have any favorite recipes.")
+        return
+
+    if recipe_name in favorite_recipes[sender_id]:
+        await user.send(f"{ctx.author.name} has shared a recipe with you: {recipe_name}")
+        await ctx.respond(f"Recipe '{recipe_name}' has been shared with {user.mention}!")
+    else:
+        await ctx.respond(f"Recipe '{recipe_name}' not found in your favorites.")
 
 @client.bridge_command(description="Suggest non-alcoholic beverage pairings for a given recipe")
 async def non_alcoholic_pairing(ctx, *, recipe: str):
