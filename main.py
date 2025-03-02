@@ -611,6 +611,24 @@ async def search_by_ingredient(ctx, *, ingredient: str):
     else:
         await ctx.respond(f"No recipes found containing '{ingredient}'.")
 
+@client.bridge_command(description="Generate a meal plan using your favorite recipes")
+async def favorite_meal_plan(ctx):
+    """Create a meal plan using only the user's saved favorite recipes."""
+    await ctx.defer()
+    user_id = str(ctx.author.id)
+
+    if user_id not in favorite_recipes or not favorite_recipes[user_id]:
+        await ctx.respond("You don't have any favorite recipes saved.")
+        return
+
+    query = (
+        f"Create a weekly meal plan using only these favorite recipes: {', '.join(favorite_recipes[user_id])}. "
+        "Ensure variety and balanced nutrition."
+    )
+
+    response = await get_chatgpt_response(query)
+    await ctx.respond(f"Here is your personalized meal plan:\n{response}")
+
 
 @client.bridge_command(description="Suggest non-alcoholic beverage pairings for a given recipe")
 async def non_alcoholic_pairing(ctx, *, recipe: str):
