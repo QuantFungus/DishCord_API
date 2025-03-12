@@ -629,6 +629,27 @@ async def favorite_meal_plan(ctx):
     response = await get_chatgpt_response(query)
     await ctx.respond(f"Here is your personalized meal plan:\n{response}")
 
+@client.bridge_command(description="Suggest seasonal recipes based on the current month")
+async def suggest_seasonal_recipes(ctx):
+    """Suggest recipes that use produce in season for the current month."""
+    await ctx.defer()
+    # Get the current month number (1-12)
+    current_month = time.localtime().tm_mon
+    # Determine the seasonal produce based on the month
+    if 3 <= current_month <= 5:
+        produce = "spring vegetables (asparagus, peas), strawberries"
+    elif 6 <= current_month <= 8:
+        produce = "summer fruits (berries, stone fruits), corn"
+    elif 9 <= current_month <= 11:
+        produce = "autumn produce (squash, apples), root vegetables"
+    else:
+        produce = "winter vegetables (brussels sprouts), citrus fruits"
+    # Prompt the assistant with a query about seasonal recipes
+    query = f"Suggest a recipe using {produce}. Explain the seasonal benefits."
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+    # End of suggest_seasonal_recipes command
+
 @client.bridge_command(description="Share a saved recipe with another user")
 async def share_recipe(ctx, user: discord.Member, *, recipe_name: str):
     """Share a saved recipe with another Discord user."""
