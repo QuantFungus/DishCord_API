@@ -668,7 +668,25 @@ async def smart_recommendations(ctx):
     )
     response = await get_chatgpt_response(query)
     await ctx.respond(response)
-    # End of smart_recommendations
+
+@client.bridge_command(description="Provide an advanced, step-by-step cooking tutorial for a dish")
+async def advanced_cooking_tutorial(ctx, *, dish: str):
+    """Provide a detailed cooking tutorial for advanced users."""
+    await ctx.defer()
+    # Additional advanced tips to be appended
+    advanced_tips = [
+        "Use a kitchen scale for precise measurements.",
+        "Consider the Maillard reaction for better browning.",
+        "Temperature control is crucial for sauce consistency."
+    ]
+    tips_str = " ".join(advanced_tips)
+    query = (
+        f"Give an advanced, step-by-step cooking tutorial for {dish}. "
+        "Include precise techniques, timing, and tips to master the dish. "
+        f"Additionally, incorporate these tips: {tips_str}"
+    )
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
 
 @client.bridge_command(description="Share a saved recipe with another user")
 async def share_recipe(ctx, user: discord.Member, *, recipe_name: str):
