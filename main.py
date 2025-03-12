@@ -650,6 +650,26 @@ async def suggest_seasonal_recipes(ctx):
     await ctx.respond(response)
     # End of suggest_seasonal_recipes command
 
+@client.bridge_command(description="Get a personalized recipe recommendation based on your preferences")
+async def smart_recommendations(ctx):
+    """Use user preferences (flavor, favorite_dish, diet) to provide a tailored recipe suggestion."""
+    await ctx.defer()
+    user_id = str(ctx.author.id)
+    if user_id not in user_preferences:
+        await ctx.respond("No preferences found. Please set them using '!setup_preferences'.")
+        return
+    prefs = user_preferences[user_id]
+    flavor = prefs.get("flavor", "no specific flavor")
+    dish = prefs.get("favorite_dish", "any dish")
+    diet = prefs.get("diet", "no dietary restrictions")
+    query = (
+        f"Suggest a {diet} recipe with a {flavor} flavor profile. "
+        f"Ideally, it should resemble a {dish} dish."
+    )
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+    # End of smart_recommendations
+
 @client.bridge_command(description="Share a saved recipe with another user")
 async def share_recipe(ctx, user: discord.Member, *, recipe_name: str):
     """Share a saved recipe with another Discord user."""
