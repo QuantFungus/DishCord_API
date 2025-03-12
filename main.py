@@ -98,6 +98,34 @@ async def generate_shopping_list(ctx):
     response = await get_chatgpt_response(query)
     await ctx.respond(f"Here is your shopping list:\n{response}")
 
+@client.bridge_command(description="Set or update your favorite cuisines")
+async def set_favorite_cuisines(ctx, *, cuisines: str):
+    """Store a list of the user's favorite cuisines (comma-separated)."""
+    await ctx.defer()
+    user_id = str(ctx.author.id)
+    cuisine_list = [c.strip() for c in cuisines.split(",") if c.strip()]
+    if user_id not in user_preferences:
+        user_preferences[user_id] = {}
+    user_preferences[user_id]["favorite_cuisines"] = cuisine_list
+    save_user_preferences()
+    await ctx.respond(f"Your favorite cuisines have been updated: {', '.join(cuisine_list)}")
+
+@client.bridge_command(description="Suggest a recipe based on your favorite cuisines")
+async def cuisine_suggestions(ctx):
+    """Suggest a recipe that matches the user's stored favorite cuisines."""
+    await ctx.defer()
+    user_id = str(ctx.author.id)
+    if user_id not in user_preferences or "favorite_cuisines" not in user_preferences[user_id]:
+        await ctx.respond("No favorite cuisines found. Please set them using '!set_favorite_cuisines'.")
+        return
+    cuisines = user_preferences[user_id]["favorite_cuisines"]
+    query = (
+        f"Suggest a recipe that combines or highlights these cuisines: {', '.join(cuisines)}. "
+        "Focus on flavor profiles and authenticity where possible."
+    )
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
 @client.bridge_command(description="Get cooking tips to improve your culinary skills")
 async def cooking_tips(ctx, skill_level: str):
     """Provide cooking tips based on skill level ('beginner', 'intermediate', 'advanced')."""
