@@ -72,33 +72,36 @@ async def display_preferences(ctx):
 async def recipe(ctx, *, ingredients: str):
     """Generate a recipe using the provided ingredients."""
     await ctx.defer()
-    query: str = f"Give me a recipe with the following ingredients: {ingredients}."
-
-    flavor: str = ""
-    dish: str = ""
-    diet: str = ""
+    
+    flavor, dish, diet = "", "", ""
     user_id = str(ctx.author.id)
     if user_id in user_preferences:
-        flavor: str = user_preferences[user_id]["flavor"]
-        dish: str = user_preferences[user_id]["favorite_dish"]
-        diet: str = user_preferences[user_id]["diet"]
-    query += f"""
-    If possible, include my personal preferences. Do not include them if they deviate too far from the
-    recipe. For example, if I like savory and bitter flavors but the recipe asks for sweet candy, it's
-    not necessary to include savory and bitter flavors.
-    Flavors: {flavor}
-    Dishes: {dish}
-    Diet: {diet}
+        flavor = user_preferences[user_id].get("flavor", "None")
+        dish = user_preferences[user_id].get("favorite_dish", "None")
+        diet = user_preferences[user_id].get("diet", "None")
+    
+    query = f"""
+    Create a **concise** and **structured** recipe using the following ingredients: {ingredients}.
+    Please follow this format:
+    - **Dish Name**: Provide a creative and appropriate dish name.
+    - **Ingredients**: List required ingredients (avoid redundancy).
+    - **Instructions**: Give a **step-by-step** short guide (concise but clear).
+    - **Nutritional Information**: If possible, estimate calories and macronutrients.
+    
+    User Preferences:
+    - **Flavor Preferences**: {flavor}
+    - **Favorite Dishes**: {dish}
+    - **Dietary Restrictions**: {diet}
+    
+    Ensure the response is **under 2000 characters** and uses **Markdown formatting**.
     """
-
+    
     response = get_chatgpt_response(query)
-
-    # Save message history
     user_id = str(ctx.author.id)
     last_query[user_id] = ingredients
     last_message[user_id] = response
-
-    # Split response into chunks of 2000 characters
+    
+    # Send response in chunks if necessary
     for i in range(0, len(response), 2000):
         await ctx.send(response[i:i+2000])
 
