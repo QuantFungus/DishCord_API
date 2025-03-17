@@ -1,147 +1,147 @@
 import discord
 import asyncio
 import os
-import random
 import logging
 import textwrap
-import re
-from discord.ext import bridge, commands
+from discord.ext import bridge
 from dotenv import load_dotenv
-from openai import OpenAI
+import openai
+from typing import Dict, List
 
 logging.basicConfig(level=logging.INFO)
 
 load_dotenv()
 
 class PyCordBot(bridge.Bot):
-    TOKEN = str(os.getenv("DISCORD_TOKEN"))
+    TOKEN = os.getenv("DISCORD_TOKEN")
     intents = discord.Intents.all()
 
 client = PyCordBot(intents=PyCordBot.intents, command_prefix="!")
-user_preferences = {}  # Store user preferences in-memory
-favorite_recipes = {}  # Store users' favorite recipes
-last_message = {}  # Stores last message for purpose of storing recipe
-last_query = {}  # Stores last query for purpose of storing recipe
 
-GPTclient = OpenAI(api_key=os.environ.get('GPT_TOKEN'))
+# Store data in-memory with type annotations for clarity
+user_preferences: Dict[str, Dict[str, str]] = {}
+favorite_recipes: Dict[str, Dict[str, str]] = {}
+last_message: Dict[str, str] = {}
+last_query: Dict[str, str] = {}
 
-# Helper Functions
-def chunk_by_lines(text: str, max_size: int = 2000):
+# Configure OpenAI
+openai.api_key = os.getenv('GPT_TOKEN')
+GPT_MODEL = "gpt-4o-mini"  # Update as needed
+
+def chunk_by_lines(text: str, max_size: int = 2000) -> List[str]:
     """
-    Splits the text into chunks of up to `max_size` characters
-    without breaking any line in the middle (unless a single
-    line itself exceeds `max_size`).
+    Splits the text into chunks of up to `max_size` characters without breaking lines.
     """
     lines = text.split('\n')
     chunks = []
     current_chunk = ""
 
     for line in lines:
+        # If the line itself is too long, break it up.
         while len(line) > max_size:
             chunks.append(line[:max_size])
             line = line[max_size:]
-
         if len(current_chunk) + len(line) + 1 <= max_size:
-            if not current_chunk:
-                current_chunk = line  # first line in the chunk
-            else:
-                current_chunk += "\n" + line
+            current_chunk = line if not current_chunk else current_chunk + "\n" + line
         else:
             chunks.append(current_chunk)
             current_chunk = line
 
     if current_chunk:
         chunks.append(current_chunk)
-
     return chunks
 
 @client.listen()
 async def on_ready():
-    print(f"Logged in as {client.user.name}")
+    logging.info(f"Logged in as {client.user.name}")
 
 @client.bridge_command(description="Ping, pong!")
-async def ping(ctx):
-    latency = (str(client.latency)).split('.')[1][1:3]
+async def ping(ctx: bridge.BridgeApplicationContext):
+    # Calculate latency in milliseconds
+    latency = int(client.latency * 1000)
     await ctx.respond(f"Pong! Bot replied in {latency} ms")
 
 @client.bridge_command(description="Displays commands DishCord bot is capable of")
-async def options(ctx):
+async def options(ctx: bridge.BridgeApplicationContext):
     commands_text = textwrap.dedent("""
     /setup_preferences <flavor> <dish> <diet> - Set your preferences.
     /recipe <ingredients> [--quick] [--meal_prep] - Generate a recipe.
     /save_recipe - Save the most recent recipe to your favorites.
     /show_favorites - Display all saved recipes.
+    /ask <query> - Ask a question to ChatGPT.
     """)
     await ctx.respond(commands_text)
 
 @client.bridge_command(description="Setup user preferences")
-async def setup_preferences(ctx, flavor: str, dish: str, diet: str):
+async def setup_preferences(ctx: bridge.BridgeApplicationContext, flavor: str, dish: str, diet: str):
     """Store user preferences for personalized suggestions."""
     user_id = str(ctx.author.id)
-    user_preferences[user_id] = {
-        "flavor": flavor,
-        "favorite_dish": dish,
-        "diet": diet
-    }
+    user_preferences[user_id] = {"flavor": flavor, "dish": dish, "diet": diet}
     await ctx.respond(
         f"Preferences saved!\n**Flavor:** {flavor}\n**Dish:** {dish}\n**Diet:** {diet}"
     )
 
 @client.bridge_command(description="Display user preferences")
-async def display_preferences(ctx):
+async def display_preferences(ctx: bridge.BridgeApplicationContext):
     """Display user preferences."""
     user_id = str(ctx.author.id)
-
     if user_id not in user_preferences:
         await ctx.respond("You don't have any preferences yet.")
         return
 
-    flavor = user_preferences[user_id]["flavor"]
-    dish = user_preferences[user_id]["favorite_dish"]
-    diet = user_preferences[user_id]["diet"]
+    prefs = user_preferences[user_id]
     await ctx.respond(
-        f"Displaying preferences!\n**Flavor:** {flavor}\n**Dish:** {dish}\n**Diet:** {diet}"
+        f"Your preferences:\n**Flavor:** {prefs.get('flavor', '')}\n**Dish:** {prefs.get('dish', '')}\n**Diet:** {prefs.get('diet', '')}"
     )
 
+async def get_chatgpt_response(query: str) -> str:
+    """
+    Asynchronously fetch a response from ChatGPT using OpenAI's API.
+    Uses asyncio.to_thread to avoid blocking the event loop.
+    """
+    def sync_chat_call() -> str:
+        response = openai.ChatCompletion.create(
+            model=GPT_MODEL,
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": query}
+            ]
+        )
+        return response.choices[0].message.content
+
+    return await asyncio.to_thread(sync_chat_call)
+
 @client.bridge_command(description="Generate a recipe based on ingredients")
-async def recipe(ctx, *, ingredients: str):
+async def recipe(ctx: bridge.BridgeApplicationContext, *, ingredients: str):
     """Generate a recipe using the provided ingredients."""
     await ctx.defer()
-    query = f"Give me a recipe with the following ingredients: {ingredients}."
-
-    flavor = ""
-    dish = ""
-    diet = ""
     user_id = str(ctx.author.id)
-    if user_id in user_preferences:
-        flavor = user_preferences[user_id]["flavor"]
-        dish = user_preferences[user_id]["favorite_dish"]
-        diet = user_preferences[user_id]["diet"]
+    prefs = user_preferences.get(user_id, {"flavor": "", "dish": "", "diet": ""})
+    
+    query = (
+        f"Give me a recipe with the following ingredients: {ingredients}.\n"
+        "If possible, include my personal preferences (only if they naturally fit the recipe). "
+        f"Flavor: {prefs['flavor']}\nDish: {prefs['dish']}\nDiet: {prefs['diet']}\n"
+    )
 
-    query += f"""
-    If possible, include my personal preferences. Do not include them if they deviate too far from the
-    recipe. For example, if I like savory and bitter flavors but the recipe asks for sweet candy, it's
-    not necessary to include savory and bitter flavors.
-    Flavors: {flavor}
-    Dishes: {dish}
-    Diet: {diet}
-    """
+    try:
+        response_text = await get_chatgpt_response(query)
+    except Exception as e:
+        logging.error("Error fetching recipe: %s", e)
+        await ctx.respond("Sorry, I encountered an error while generating the recipe.")
+        return
 
-    response = get_chatgpt_response(query)
-
-    # Save message history
+    # Save the response for later use (e.g., saving favorites)
     last_query[user_id] = ingredients
-    last_message[user_id] = response
+    last_message[user_id] = response_text
 
-    chunks = chunk_by_lines(response, 2000)
-    for chunk in chunks:
+    for chunk in chunk_by_lines(response_text):
         await ctx.send(chunk)
 
 @client.bridge_command(description="Save a recipe to your favorites")
-async def save_recipe(ctx):
-    """Save a recipe to the user's favorites."""
+async def save_recipe(ctx: bridge.BridgeApplicationContext):
+    """Save the most recent recipe to the user's favorites."""
     user_id = str(ctx.author.id)
-
     if user_id not in last_message:
         await ctx.respond("No previously generated recipe!")
         return
@@ -153,39 +153,32 @@ async def save_recipe(ctx):
     await ctx.respond("Recipe saved to your favorites!")
 
 @client.bridge_command(description="Show all your favorite recipes")
-async def show_favorites(ctx):
-    """Display all the favorite recipes of the user."""
+async def show_favorites(ctx: bridge.BridgeApplicationContext):
+    """Display all saved favorite recipes."""
     user_id = str(ctx.author.id)
     if user_id in favorite_recipes and favorite_recipes[user_id]:
-        recipes = list(favorite_recipes[user_id].keys())
-        recipe_list = "\n".join(recipes)
-        await ctx.respond(f"Your favorite recipes:\n{recipe_list}")
+        recipe_titles = "\n".join(f"- {title}" for title in favorite_recipes[user_id].keys())
+        await ctx.respond(f"Your favorite recipes:\n{recipe_titles}")
     else:
         await ctx.respond("You don't have any favorite recipes yet.")
 
 @client.bridge_command(description="Ask a question to ChatGPT")
-async def ask(ctx, *, query: str):
+async def ask(ctx: bridge.BridgeApplicationContext, *, query: str):
+    """Ask a question to ChatGPT and get a response."""
     await ctx.defer()
-    response = get_chatgpt_response(query)
+    try:
+        response_text = await get_chatgpt_response(query)
+    except Exception as e:
+        logging.error("Error fetching answer: %s", e)
+        await ctx.respond("Sorry, I encountered an error while processing your question.")
+        return
 
-    chunks = chunk_by_lines(response, 2000)
-    for chunk in chunks:
+    for chunk in chunk_by_lines(response_text):
         await ctx.send(chunk)
 
-def get_chatgpt_response(query: str) -> str:
-    completion = GPTclient.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": query}
-        ]
-    )
-    return completion.choices[0].message.content
-
 async def main_bot():
-    print("Bot is starting...")
-    await client.start(PyCordBot().TOKEN)
+    logging.info("Bot is starting...")
+    await client.start(client.TOKEN)
 
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(asyncio.gather(main_bot()))
+    asyncio.run(main_bot())
