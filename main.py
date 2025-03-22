@@ -68,6 +68,7 @@ async def options(ctx: bridge.BridgeApplicationContext):
     /recipe <ingredients> [--quick] [--meal_prep] - Generate a recipe.
     /save_recipe - Save the most recent recipe to your favorites.
     /show_favorites - Display all saved recipes.
+    /remove_recipe <title> - Remove a saved recipe.
     /ask <query> - Ask a question to ChatGPT.
     """)
     await ctx.respond(commands_text)
@@ -161,6 +162,20 @@ async def show_favorites(ctx: bridge.BridgeApplicationContext):
         await ctx.respond(f"Your favorite recipes:\n{recipe_titles}")
     else:
         await ctx.respond("You don't have any favorite recipes yet.")
+
+@client.bridge_command(description="Remove a favorite recipe")
+async def remove_recipe(ctx: bridge.BridgeApplicationContext, *, title: str):
+    """Remove a saved favorite recipe using the recipe title."""
+    user_id = str(ctx.author.id)
+    if user_id not in favorite_recipes or not favorite_recipes[user_id]:
+        await ctx.respond("You don't have any favorite recipes yet.")
+        return
+
+    if title in favorite_recipes[user_id]:
+        del favorite_recipes[user_id][title]
+        await ctx.respond(f"Removed favorite recipe: {title}")
+    else:
+        await ctx.respond("No favorite recipe found with that title!")
 
 @client.bridge_command(description="Ask a question to ChatGPT")
 async def ask(ctx: bridge.BridgeApplicationContext, *, query: str):
