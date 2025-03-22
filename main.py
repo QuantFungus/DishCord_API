@@ -805,6 +805,23 @@ async def remove_recipe(ctx, *, recipe_name: str):
     else:
         await ctx.respond(f"Recipe '{recipe_name}' not found in your favorites.")
 
+@client.bridge_command(description="Bookmark a recipe with optional tags")
+async def bookmark_recipe(ctx, recipe: str, *, tags: str = ""):
+    """Save a recipe to the user's favorites with optional tags."""
+    user_id = str(ctx.author.id)
+    if user_id not in favorite_recipes:
+        favorite_recipes[user_id] = []
+    if recipe not in favorite_recipes[user_id]:
+        favorite_recipes[user_id].append(recipe)
+
+    if tags:
+        tag_list = [t.strip() for t in tags.split(",") if t.strip()]
+        if user_id not in recipe_tags:
+            recipe_tags[user_id] = {}
+        recipe_tags[user_id][recipe] = tag_list
+
+    await ctx.respond(f"Recipe bookmarked! Tags: {tags if tags else 'None'}")
+
 async def main_bot():
     print("Bot is starting...")
     await client.start(PyCordBot().TOKEN)
