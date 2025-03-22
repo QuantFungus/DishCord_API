@@ -821,6 +821,25 @@ async def bookmark_recipe(ctx, recipe: str, *, tags: str = ""):
         recipe_tags[user_id][recipe] = tag_list
 
     await ctx.respond(f"Recipe bookmarked! Tags: {tags if tags else 'None'}")
+    
+@client.bridge_command(description="Suggest a seasonal recipe")
+async def seasonal_recipe(ctx):
+    """Suggest recipes using produce in season for the current month."""
+    await ctx.defer()
+    month = time.localtime().tm_mon
+    seasonal_map = {
+        (12, 1, 2): "root vegetables, citrus",
+        (3, 4, 5): "asparagus, peas, strawberries",
+        (6, 7, 8): "corn, tomatoes, berries",
+        (9, 10, 11): "pumpkin, apples, squash"
+    }
+    for months, produce in seasonal_map.items():
+        if month in months:
+            break
+
+    query = f"Suggest a recipe using the following seasonal produce: {produce}"
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
 
 async def main_bot():
     print("Bot is starting...")
