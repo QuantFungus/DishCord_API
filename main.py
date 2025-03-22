@@ -841,6 +841,17 @@ async def seasonal_recipe(ctx):
     response = await get_chatgpt_response(query)
     await ctx.respond(response)
 
+@client.bridge_command(description="Get an advanced tutorial for a dish")
+async def advanced_tutorial(ctx, *, dish: str):
+    """Get a detailed, pro-level tutorial for a given dish."""
+    await ctx.defer()
+    query = (
+        f"Give me an advanced tutorial for preparing {dish}. "
+        "Include precise measurements, cooking techniques, timing, and tips used by professional chefs."
+    )
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
 async def main_bot():
     print("Bot is starting...")
     await client.start(PyCordBot().TOKEN)
