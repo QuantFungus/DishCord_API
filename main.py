@@ -3,12 +3,13 @@ import asyncio
 import os
 import logging
 import textwrap
+import io  # Used for exporting favorites as a file
 from discord.ext import bridge
 from dotenv import load_dotenv
 import openai
 from typing import Dict, List
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 load_dotenv()
 
@@ -65,10 +66,12 @@ async def ping(ctx: bridge.BridgeApplicationContext):
 async def options(ctx: bridge.BridgeApplicationContext):
     commands_text = textwrap.dedent("""
     /setup_preferences <flavor> <dish> <diet> - Set your preferences.
-    /recipe <ingredients> [--quick] [--meal_prep] - Generate a recipe.
+    /display_preferences - Display your current preferences.
+    /recipe <ingredients> - Generate a recipe based on your ingredients.
     /save_recipe - Save the most recent recipe to your favorites.
     /show_favorites - Display all saved recipes.
     /remove_recipe <title> - Remove a saved recipe.
+    /export_favorites - Export all favorite recipes as a text file.
     /ask <query> - Ask a question to ChatGPT.
     """)
     await ctx.respond(commands_text)
@@ -176,6 +179,24 @@ async def remove_recipe(ctx: bridge.BridgeApplicationContext, *, title: str):
         await ctx.respond(f"Removed favorite recipe: {title}")
     else:
         await ctx.respond("No favorite recipe found with that title!")
+
+@client.bridge_command(description="Export your favorite recipes to a text file")
+async def export_favorites(ctx: bridge.BridgeApplicationContext):
+    """Export all your saved favorite recipes as a text file attachment."""
+    user_id = str(ctx.author.id)
+    if user_id not in favorite_recipes or not favorite_recipes[user_id]:
+        await ctx.respond("You don't have any favorite recipes to export!")
+        return
+
+    output = io.StringIO()
+    output.write("Favorite Recipes:\n")
+    output.write("=" * 40 + "\n\n")
+    for title, recipe in favorite_recipes[user_id].items():
+        output.write(f"Recipe: {title}\n{'-' * 20}\n{recipe}\n\n")
+    output.seek(0)
+
+    file = discord.File(fp=output, filename="favorite_recipes.txt")
+    await ctx.respond("Here are your exported favorite recipes:", file=file)
 
 @client.bridge_command(description="Ask a question to ChatGPT")
 async def ask(ctx: bridge.BridgeApplicationContext, *, query: str):
