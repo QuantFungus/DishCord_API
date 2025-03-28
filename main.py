@@ -128,6 +128,42 @@ async def show_favorites(ctx):
     else:
         await ctx.respond("You don't have any favorite recipes yet.")
 
+@client.bridge_command(description="Recommend a recipe related to input")
+async def recommend(ctx, recipe: str):
+    """Generates a recipe based off an idea rather than ingredients"""
+    
+    flavor, dish, diet = "", "", ""
+    user_id = str(ctx.author.id)
+    if user_id in user_preferences:
+        flavor = user_preferences[user_id].get("flavor", "None")
+        dish = user_preferences[user_id].get("favorite_dish", "None")
+        diet = user_preferences[user_id].get("diet", "None")
+
+    query = f"""
+    Create a **concise** and **structured** recipe using the following recipe: {recipe}.
+    Please follow this format:
+    - **Dish Name**: Provide a creative and appropriate dish name.
+    - **Ingredients**: List required ingredients (avoid redundancy).
+    - **Instructions**: Give a **step-by-step** short guide (concise but clear).
+    - **Nutritional Information**: If possible, estimate calories and macronutrients.
+    
+    User Preferences:
+    - **Flavor Preferences**: {flavor}
+    - **Favorite Dishes**: {dish}
+    - **Dietary Restrictions**: {diet}
+    
+    Ensure the response is **under 2000 characters** and uses **Markdown formatting**.
+    """
+    
+    response = get_chatgpt_response(query)
+    user_id = str(ctx.author.id)
+    last_query[user_id] = recipe
+    last_message[user_id] = response
+    
+    # Send response in chunks if necessary
+    for i in range(0, len(response), 2000):
+        await ctx.send(response[i:i+2000])
+
 @client.bridge_command(description="nametest")
 async def nametest(ctx):
     """dev cmd for testing local storage."""
