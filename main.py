@@ -657,6 +657,40 @@ async def favorite_meal_plan(ctx):
     response = await get_chatgpt_response(query)
     await ctx.respond(f"Here is your personalized meal plan:\n{response}")
 
+@client.bridge_command(description="Exclude certain allergens or ingredients from all future suggestions")
+async def set_allergens(ctx, *, allergens: str):
+    """
+    Store user-defined allergens to be excluded from recipe suggestions.
+    Usage example: !set_allergens peanuts, shellfish
+    """
+    await ctx.defer()
+    user_id = str(ctx.author.id)
+    allergen_list = [a.strip().lower() for a in allergens.split(",") if a.strip()]
+
+    if user_id not in user_preferences:
+        user_preferences[user_id] = {}
+
+    user_preferences[user_id]["allergens"] = allergen_list
+    save_user_preferences()
+    await ctx.respond(f"Allergens set! I will avoid: {', '.join(allergen_list)}")
+
+@client.bridge_command(description="Generate a recipe with allergens excluded")
+async def allergen_safe_recipe(ctx, *, ingredients: str):
+    """
+    Generate a recipe that avoids any user-defined allergens.
+    Usage: !allergen_safe_recipe chicken, mushrooms
+    """
+    await ctx.defer()
+    user_id = str(ctx.author.id)
+    allergens = user_preferences.get(user_id, {}).get("allergens", [])
+
+    query = (
+        f"Create a recipe using these ingredients: {ingredients}, but strictly avoid: {', '.join(allergens)}. "
+        "Ensure the final recipe does not contain these allergens."
+    )
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
 @client.bridge_command(description="Suggest seasonal recipes based on the current month")
 async def suggest_seasonal_recipes(ctx):
     """Suggest recipes that use produce in season for the current month."""
