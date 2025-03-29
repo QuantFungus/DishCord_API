@@ -691,6 +691,42 @@ async def allergen_safe_recipe(ctx, *, ingredients: str):
     response = await get_chatgpt_response(query)
     await ctx.respond(response)
 
+@client.bridge_command(description="Start a short cooking quiz to test your knowledge")
+async def cooking_quiz(ctx):
+    """
+    Presents a short cooking quiz to the user.
+    Usage: !cooking_quiz
+    """
+    await ctx.defer()
+    questions = [
+        ("What is the Maillard reaction?", "A chemical reaction between amino acids and reducing sugars that gives browned food its flavor."),
+        ("Name one method to thicken a sauce without cornstarch or flour.", "Reducing the sauce by simmering it to evaporate liquid."),
+        ("At what temperature does water typically boil at sea level (in Celsius)?", "100°C")
+    ]
+    # Pick a random question
+    import random
+    question, correct_answer = random.choice(questions)
+
+    await ctx.respond(f"Cooking Quiz!\nQuestion: {question}\nAnswer below, then compare with `!reveal_answer`.")
+
+    # Store correct answer in user prefs (temporary usage)
+    user_id = str(ctx.author.id)
+    user_preferences[user_id]["quiz_answer"] = correct_answer
+    save_user_preferences()
+
+@client.bridge_command(description="Reveal the correct answer to the cooking quiz")
+async def reveal_answer(ctx):
+    """Reveal the correct quiz answer stored in user preferences."""
+    user_id = str(ctx.author.id)
+
+    if user_id not in user_preferences or "quiz_answer" not in user_preferences[user_id]:
+        await ctx.respond("No quiz answer found. Start a quiz with `!cooking_quiz`.")
+        return
+
+    correct_answer = user_preferences[user_id].pop("quiz_answer")
+    save_user_preferences()
+    await ctx.respond(f"The correct answer is: {correct_answer}")
+
 @client.bridge_command(description="Suggest seasonal recipes based on the current month")
 async def suggest_seasonal_recipes(ctx):
     """Suggest recipes that use produce in season for the current month."""
