@@ -748,6 +748,34 @@ async def suggest_seasonal_recipes(ctx):
     await ctx.respond(response)
     # End of suggest_seasonal_recipes command
 
+@client.bridge_command(description="Generate a recipe using leftover ingredients")
+async def leftover_recipe(ctx, *, leftovers: str):
+    """
+    Suggest a creative recipe based on user-defined leftover ingredients.
+    Usage: !leftover_recipe roasted chicken, rice, broccoli
+    """
+    await ctx.defer()
+    query = (
+        f"Propose a recipe that uses these leftover ingredients: {leftovers}. "
+        "Focus on creativity and minimizing food waste."
+    )
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
+@client.bridge_command(description="Suggest best storage practices for leftover ingredients")
+async def leftover_storage(ctx, *, leftovers: str):
+    """
+    Provide tips on storing leftover ingredients to keep them fresh.
+    Usage: !leftover_storage cooked pasta, tomato sauce
+    """
+    await ctx.defer()
+    query = (
+        f"Give me best storage practices for the following leftovers: {leftovers}. "
+        "Include recommended containers, fridge/freezer time, and safety considerations."
+    )
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
 @client.bridge_command(description="Get a personalized recipe recommendation based on your preferences")
 async def smart_recommendations(ctx):
     """Use user preferences (flavor, favorite_dish, diet) to provide a tailored recipe suggestion."""
