@@ -102,8 +102,13 @@ async def recipe(ctx, *, ingredients: str):
     last_message[user_id] = response
     
     # Send response in chunks if necessary
-    for i in range(0, len(response), 2000):
-        await ctx.send(response[i:i+2000])
+    if len(response) > 2000:
+        chunks = [response[i:i+2000] for i in range(0, len(response), 2000)]
+        for chunk in chunks:
+            await ctx.send(chunk)
+    else:
+        await ctx.send(response)
+
 
 @client.bridge_command(description="Save a recipe to your favorites")
 async def save_recipe(ctx):
@@ -131,7 +136,8 @@ async def show_favorites(ctx):
 @client.bridge_command(description="Recommend a recipe related to input")
 async def recommend(ctx, recipe: str):
     """Generates a recipe based off an idea rather than ingredients"""
-    
+    await ctx.defer()
+
     flavor, dish, diet = "", "", ""
     user_id = str(ctx.author.id)
     if user_id in user_preferences:
@@ -161,8 +167,13 @@ async def recommend(ctx, recipe: str):
     last_message[user_id] = response
     
     # Send response in chunks if necessary
-    for i in range(0, len(response), 2000):
-        await ctx.send(response[i:i+2000])
+    if len(response) > 2000:
+        chunks = [response[i:i+2000] for i in range(0, len(response), 2000)]
+        for chunk in chunks:
+            await ctx.send(chunk)
+    else:
+        await ctx.send(response)
+
 
 @client.bridge_command(description="nametest")
 async def nametest(ctx):
