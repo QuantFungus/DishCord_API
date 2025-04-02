@@ -73,6 +73,7 @@ async def options(ctx: bridge.BridgeApplicationContext):
     /remove_recipe <title> - Remove a saved recipe.
     /export_favorites - Export all favorite recipes as a text file.
     /ask <query> - Ask a question to ChatGPT.
+    /meal_plan - Generate a weekly meal plan based on your preferences and favorites.
     """)
     await ctx.respond(commands_text)
 
@@ -197,6 +198,46 @@ async def export_favorites(ctx: bridge.BridgeApplicationContext):
 
     file = discord.File(fp=output, filename="favorite_recipes.txt")
     await ctx.respond("Here are your exported favorite recipes:", file=file)
+
+@client.bridge_command(description="Generate a weekly meal plan based on your preferences and favorites")
+async def meal_plan(ctx: bridge.BridgeApplicationContext):
+    """Generate a weekly meal plan for the upcoming week, including breakfast, lunch, and dinner for each day, plus a grocery list."""
+    await ctx.defer()
+    user_id = str(ctx.author.id)
+    prefs = user_preferences.get(user_id, {"flavor": "", "dish": "", "diet": ""})
+    favorites = favorite_recipes.get(user_id, {})
+
+    query = (
+        "Create a detailed weekly meal plan for the upcoming week (Monday to Sunday). "
+        "Each day should include recipes for breakfast, lunch, and dinner. "
+    )
+    
+    if prefs:
+        query += (
+            f"Consider the following user preferences: Flavor: {prefs.get('flavor', '')}, "
+            f"Dish: {prefs.get('dish', '')}, Diet: {prefs.get('diet', '')}. "
+        )
+    
+    if favorites:
+        # List favorite recipe titles to incorporate if they fit naturally
+        favorite_list = "\n".join(f"- {title}" for title in favorites.keys())
+        query += (
+            "If possible, incorporate the following favorite recipes where appropriate:\n"
+            f"{favorite_list}\n"
+        )
+    
+    query += "At the end, include a consolidated grocery shopping list for the week."
+
+    try:
+        response_text = await get_chatgpt_response(query)
+    except Exception as e:
+        logging.error("Error generating meal plan: %s", e)
+        await ctx.respond("Sorry, I encountered an error while generating your meal plan.")
+        return
+
+    for chunk in chunk_by_lines(response_text):
+        await ctx.send(chunk)
+
 
 @client.bridge_command(description="Ask a question to ChatGPT")
 async def ask(ctx: bridge.BridgeApplicationContext, *, query: str):
