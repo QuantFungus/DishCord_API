@@ -798,6 +798,30 @@ async def cuisine_challenge(ctx, cuisine: str = ""):
     )
     response = await get_chatgpt_response(query)
     await ctx.respond(response)
+    
+@client.bridge_command(description="Show a macro summary of your favorite recipes")
+async def macro_summary(ctx):
+    """
+    Summarize the total macronutrients (protein, fat, carbs) across all favorite recipes.
+    Usage: !macro_summary
+    """
+    await ctx.defer()
+    user_id = str(ctx.author.id)
+
+    if user_id not in favorite_recipes or not favorite_recipes[user_id]:
+        await ctx.respond("You don't have any favorite recipes yet.")
+        return
+
+    # Construct a prompt to analyze macros for each recipe
+    recipes_text = ", ".join(favorite_recipes[user_id])
+    query = (
+        "Analyze the following recipes collectively: "
+        f"{recipes_text}. "
+        "Estimate total protein, fat, and carbs across all these recipes. "
+        "Provide an approximate macro breakdown."
+    )
+    response = await get_chatgpt_response(query)
+    await ctx.respond(f"Macro Summary:\n{response}")
 
 @client.bridge_command(description="Get a personalized recipe recommendation based on your preferences")
 async def smart_recommendations(ctx):
