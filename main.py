@@ -823,6 +823,28 @@ async def macro_summary(ctx):
     response = await get_chatgpt_response(query)
     await ctx.respond(f"Macro Summary:\n{response}")
 
+@client.bridge_command(description="Set a cooking reminder for yourself")
+async def cooking_reminder(ctx, time_in_minutes: int, *, reminder_text: str):
+    """
+    Schedules a reminder for the user after the specified minutes.
+    Usage: !cooking_reminder 30 Let's check the stew
+    """
+    user_id = str(ctx.author.id)
+    await ctx.respond(f"Reminder set! I'll remind you in {time_in_minutes} minutes to: {reminder_text}")
+
+    # Wait for the specified time
+    await asyncio.sleep(time_in_minutes * 60)
+
+    # Send a reminder directly to the user's DMs
+    user = await client.fetch_user(int(user_id))
+    if user is not None:
+        try:
+            await user.send(f"**Reminder:** {reminder_text}")
+        except:
+            # If DMs are closed, send in channel
+            channel = ctx.channel
+            await channel.send(f"{ctx.author.mention}, here's your reminder: {reminder_text}")
+
 @client.bridge_command(description="Get a personalized recipe recommendation based on your preferences")
 async def smart_recommendations(ctx):
     """Use user preferences (flavor, favorite_dish, diet) to provide a tailored recipe suggestion."""
