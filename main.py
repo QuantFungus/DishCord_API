@@ -776,6 +776,29 @@ async def leftover_storage(ctx, *, leftovers: str):
     response = await get_chatgpt_response(query)
     await ctx.respond(response)
 
+@client.bridge_command(description="Invite users to explore a random or specified cuisine challenge")
+async def cuisine_challenge(ctx, cuisine: str = ""):
+    """
+    Propose a cooking challenge to the user. If no cuisine is specified,
+    randomly select one from a preset list. Otherwise, use the provided cuisine.
+    Usage: !cuisine_challenge <optional cuisine>
+    """
+    await ctx.defer()
+
+    # Default list of cuisines for random selection
+    default_cuisines = ["Italian", "Mexican", "Thai", "Indian", "French", "Greek"]
+    if not cuisine:
+        import random
+        cuisine = random.choice(default_cuisines)
+
+    query = (
+        f"Propose a cooking challenge focusing on {cuisine} cuisine. "
+        "Include an overview of traditional dishes, key ingredients, "
+        "and a suggested recipe or two to inspire exploration."
+    )
+    response = await get_chatgpt_response(query)
+    await ctx.respond(response)
+
 @client.bridge_command(description="Get a personalized recipe recommendation based on your preferences")
 async def smart_recommendations(ctx):
     """Use user preferences (flavor, favorite_dish, diet) to provide a tailored recipe suggestion."""
