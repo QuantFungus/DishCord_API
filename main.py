@@ -4,6 +4,7 @@ import os
 import logging
 import textwrap
 import io  # Used for exporting favorites as a file
+import random 
 from discord.ext import bridge
 from dotenv import load_dotenv
 import openai
@@ -74,6 +75,7 @@ async def options(ctx: bridge.BridgeApplicationContext):
     /export_favorites - Export all favorite recipes as a text file.
     /ask <query> - Ask a question to ChatGPT.
     /meal_plan - Generate a weekly meal plan based on your preferences and favorites.
+    /random_recipe - Display a random favorite recipe.
     """)
     await ctx.respond(commands_text)
 
@@ -199,6 +201,18 @@ async def export_favorites(ctx: bridge.BridgeApplicationContext):
     file = discord.File(fp=output, filename="favorite_recipes.txt")
     await ctx.respond("Here are your exported favorite recipes:", file=file)
 
+@client.bridge_command(description="Display a random favorite recipe")
+async def random_recipe(ctx: bridge.BridgeApplicationContext):
+    """Fetch a random recipe from your favorites and display it."""
+    user_id = str(ctx.author.id)
+    if user_id not in favorite_recipes or not favorite_recipes[user_id]:
+        await ctx.respond("You don't have any favorite recipes to choose from!")
+        return
+    # Choose a random favorite recipe
+    recipe_title = random.choice(list(favorite_recipes[user_id].keys()))
+    recipe_content = favorite_recipes[user_id][recipe_title]
+    await ctx.respond(f"Here's a random favorite recipe for you:\n**{recipe_title}**\n{recipe_content}")
+
 @client.bridge_command(description="Generate a weekly meal plan based on your preferences and favorites")
 async def meal_plan(ctx: bridge.BridgeApplicationContext):
     """Generate a weekly meal plan for the upcoming week, including breakfast, lunch, and dinner for each day, plus a grocery list."""
@@ -237,7 +251,6 @@ async def meal_plan(ctx: bridge.BridgeApplicationContext):
 
     for chunk in chunk_by_lines(response_text):
         await ctx.send(chunk)
-
 
 @client.bridge_command(description="Ask a question to ChatGPT")
 async def ask(ctx: bridge.BridgeApplicationContext, *, query: str):
