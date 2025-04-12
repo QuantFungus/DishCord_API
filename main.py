@@ -904,6 +904,35 @@ async def announce_recipe(ctx, *, ingredients: str):
     user_preferences[uid]["announcement_history"].append(response)
     save_user_preferences()
 
+@client.bridge_command(description="Export your favorite recipes as a JSON file")
+async def export_favorites(ctx):
+    """Export your favorite recipes to a JSON file attachment."""
+    user_id = str(ctx.author.id)
+    if user_id not in favorite_recipes or not favorite_recipes[user_id]:
+        await ctx.respond("You have no favorite recipes to export.")
+        return
+    data = json.dumps(favorite_recipes[user_id], indent=2)
+    filename = f"{user_id}_favorites.json"
+    with open(filename, "w") as f:
+        f.write(data)
+    await ctx.respond(file=discord.File(filename, filename=filename))
+
+@client.bridge_command(description="Import favorite recipes from a JSON file")
+async def import_favorites(ctx):
+    """Import your favorite recipes from an attached JSON file."""
+    if not ctx.message.attachments:
+        await ctx.respond("Please attach a JSON file containing your favorite recipes.")
+        return
+    attachment = ctx.message.attachments[0]
+    try:
+        file_data = await attachment.read()
+        imported = json.loads(file_data.decode("utf-8"))
+    except Exception as e:
+        await ctx.respond("Failed to parse the JSON file. Please check the file format.")
+        return
+    user_id = str(ctx.author.id)
+    favorite_recipes[user_id] = imported
+    await ctx.respond("Favorite recipes imported successfully!")
 
 @client.bridge_command(description="Share a saved recipe with another user")
 async def share_recipe(ctx, user: discord.Member, *, recipe_name: str):
