@@ -883,6 +883,28 @@ async def advanced_cooking_tutorial(ctx, *, dish: str):
     response = await get_chatgpt_response(query)
     await ctx.respond(response)
 
+@client.bridge_command(description="Announce a recipe suggestion via text-to-speech")
+async def announce_recipe(ctx, *, ingredients: str):
+    """Generate and announce a recipe suggestion via TTS to engage users."""
+    await ctx.defer()
+    query = f"Generate a brief and enthusiastic recipe suggestion for {ingredients} ideal for a voice announcement."
+    try:
+        response = await get_chatgpt_response(query)
+    except Exception as e:
+        await ctx.respond("Sorry, I couldn't fetch a recipe suggestion right now.")
+        return
+    announcement = f":loudspeaker: Recipe Announcement: {response}"
+    print(f"Announcement for {ctx.author.id}: {response}")
+    await ctx.respond(announcement, tts=True)
+    uid = str(ctx.author.id)
+    if uid not in user_preferences:
+        user_preferences[uid] = {}
+    if "announcement_history" not in user_preferences[uid]:
+        user_preferences[uid]["announcement_history"] = []
+    user_preferences[uid]["announcement_history"].append(response)
+    save_user_preferences()
+
+
 @client.bridge_command(description="Share a saved recipe with another user")
 async def share_recipe(ctx, user: discord.Member, *, recipe_name: str):
     """Share a saved recipe with another Discord user."""
