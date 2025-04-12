@@ -949,6 +949,34 @@ async def share_recipe(ctx, user: discord.Member, *, recipe_name: str):
     else:
         await ctx.respond(f"Recipe '{recipe_name}' not found in your favorites.")
 
+@client.bridge_command(description="Show statistics for your favorite recipes")
+async def recipe_stats(ctx):
+    """Display statistics about your favorite recipes, including count and average ratings."""
+    await ctx.defer()
+    user_id = str(ctx.author.id)
+    if user_id not in favorite_recipes or not favorite_recipes[user_id]:
+        await ctx.respond("You have no favorite recipes.")
+        return
+    total_recipes = len(favorite_recipes[user_id])
+    total_ratings = []
+    top_recipe = None
+    top_avg = 0
+    for item in favorite_recipes[user_id]:
+        # Assume an item can be a dict with 'name' and 'ratings'
+        if isinstance(item, dict) and "ratings" in item and item["ratings"]:
+            avg = sum(item["ratings"]) / len(item["ratings"])
+            total_ratings.append(avg)
+            if avg > top_avg:
+                top_avg = avg
+                top_recipe = item.get("name", "Unnamed Recipe")
+    overall_avg = sum(total_ratings) / len(total_ratings) if total_ratings else "N/A"
+    message = f"Total recipes: {total_recipes}\nOverall average rating: {overall_avg}"
+    if top_recipe:
+        message += f"\nBest rated: {top_recipe} (Avg: {top_avg:.2f})"
+    else:
+        message += "\nNo rated recipes available."
+    await ctx.respond(message)
+
 recipe_tags = {}  # Dictionary to store recipe tags
 
 @client.bridge_command(description="Tag a saved recipe for better organization")
