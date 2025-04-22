@@ -36,7 +36,6 @@ def save_data():
 
 # -------------------- Bot Setup --------------------
 class PyCordBot(bridge.Bot):
-    """Custom Bot class using discord.py Bridge."""
     TOKEN = os.getenv('DISCORD_TOKEN')
     intents = discord.Intents.all()
 
@@ -47,6 +46,14 @@ openai.api_key = os.getenv('GPT_TOKEN')
 GPT_MODEL = os.getenv('GPT_MODEL', 'gpt-4o-mini')
 
 # -------------------- Utilities --------------------
+JOKES = [
+    "Why did the tomato blush? Because it saw the salad dressing!",
+    "I would tell you a joke about pizza, but it's too cheesy.",
+    "Why don't eggs tell jokes? They'd crack each other up.",
+    "I'll call you later. Don't call me later, call me Dad!",
+    "What do you call fake spaghetti? An impasta!"
+]
+
 def chunk_by_lines(text: str, max_size: int = 2000):
     """
     Split `text` into chunks up to max_size characters without breaking lines.
@@ -120,11 +127,15 @@ async def options(ctx):
     /show_favorites                      • List saved recipes
     /remove_recipe <title>               • Delete a favorite
     /clear_favorites                     • Remove all favorites
+    /rename_recipe <old> <new>           • Rename a favorite recipe
     /export_favorites                    • Download favorites as text file
     /random_recipe                       • Show a random favorite
+    /share_recipe <member> <title>       • Share a favorite via DM
 
     /meal_plan                           • Create a weekly meal plan
     /ask <query>                         • Ask ChatGPT any question
+    /remind_me <seconds> <message>       • Set a quick reminder
+    /joke                                • Hear a random joke
     """)
     await ctx.respond(f"```\n{commands_text}```")
 
@@ -219,6 +230,28 @@ async def clear_favorites(ctx):
     else:
         await ctx.respond("You had no favorites to clear.")
 
+@client.bridge_command(description="Rename a favorite recipe.")
+async def rename_recipe(ctx, old_title: str, new_title: str):
+    uid = str(ctx.author.id)
+    favs = data['recipes'].get(uid, {})
+    if old_title not in favs:
+        return await ctx.respond("Old title not found in your favorites.")
+    favs[new_title] = favs.pop(old_title)
+    save_data()
+    await ctx.respond(f"✏️ Renamed **{old_title}** to **{new_title}**")
+
+@client.bridge_command(description="Share a favorite recipe with another user.")
+async def share_recipe(ctx, member: discord.Member, *, title: str):
+    uid = str(ctx.author.id)
+    favs = data['recipes'].get(uid, {})
+    if title not in favs:
+        return await ctx.respond("Recipe not found in your favorites.")
+    try:
+        await member.send(f"📬 {ctx.author.display_name} shared a recipe with you:\n**{title}**\n{favs[title]}")
+        await ctx.respond(f"✅ Shared **{title}** with {member.display_name}.")
+    except Exception:
+        await ctx.respond("❗ Couldn't DM that user. Do they allow DMs from this server?")
+
 @client.bridge_command(description="Export favorites as a text file.")
 async def export_favorites(ctx):
     uid = str(ctx.author.id)
@@ -252,15 +285,15 @@ async def meal_plan(ctx):
     favs = data['recipes'].get(uid, {})
 
     query = (
-        "Create a weekly meal plan (Mon–Sun) with breakfast, lunch, dinner."
+        "Create a weekly meal plan (Mon–Sun) with breakfast, lunch, dinner." 
     )
     if prefs:
         pref_str = ", ".join(f"{k}: {v}" for k, v in prefs.items())
         query += f" Consider preferences: {pref_str}."
     if favs:
         fav_list = ", ".join(favs.keys())
-        query += f" Include favorite recipes when possible: {fav_list}."
-    query += " Provide a consolidated grocery list at the end."
+        query += f" Include favorites where possible: {fav_list}."
+    query += " Provide a consolidated grocery list."
 
     try:
         plan = await get_chatgpt_response(query)
@@ -281,6 +314,19 @@ async def ask(ctx, *, question: str):
         return await ctx.respond("❗ Error processing your question.")
     for chunk in chunk_by_lines(answer):
         await ctx.send(chunk)
+
+@client.bridge_command(description="Set a one-off reminder in seconds.")
+async def remind_me(ctx, seconds: int, *, message: str):
+    await ctx.respond(f"⏰ Okay, I'll remind you in {seconds} seconds.")
+    await asyncio.sleep(seconds)
+    try:
+        await ctx.author.send(f"🔔 Reminder: {message}")
+    except Exception:
+        await ctx.respond("❗ Couldn't DM you. Do you allow DMs?" )
+
+@client.bridge_command(description="Tell a random joke.")
+async def joke(ctx):
+    await ctx.respond(random.choice(JOKES))
 
 # -------------------- Main --------------------
 async def main_bot():
