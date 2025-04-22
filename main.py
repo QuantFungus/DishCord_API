@@ -16,23 +16,33 @@ load_dotenv()
 
 DATA_FILE = os.getenv('DATA_FILE', 'bot_data.json')
 
+# Default data structure
+_default_data = {
+    "prefs": {},      # user_id -> { flavor, dish, diet }
+    "recipes": {},    # user_id -> { title -> recipe_text }
+    "last_query": {}, # user_id -> last ingredients
+    "last_msg": {}    # user_id -> last generated recipe text
+}
+
 # Load or initialize persistent storage
 if os.path.exists(DATA_FILE):
-    with open(DATA_FILE, 'r') as f:
-        data = json.load(f)
+    try:
+        with open(DATA_FILE, 'r') as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        logging.warning(f"Could not load {DATA_FILE}: {e}, initializing empty data.")
+        data = _default_data.copy()
 else:
-    data = {
-        "prefs": {},            # user_id -> { flavor, dish, diet }
-        "recipes": {},          # user_id -> { title -> recipe_text }
-        "last_query": {},       # user_id -> last ingredients
-        "last_msg": {}          # user_id -> last generated recipe text
-    }
+    data = _default_data.copy()
 
 
 def save_data():
-    """Write the current data dict back to disk."""
-    with open(DATA_FILE, 'w') as f:
-        json.dump(data, f, indent=2)
+    """Write the current data dict back to disk safely."""
+    try:
+        with open(DATA_FILE, 'w') as f:
+            json.dump(data, f, indent=2)
+    except IOError as e:
+        logging.error(f"Failed to save data to {DATA_FILE}: {e}")
 
 # -------------------- Bot Setup --------------------
 class PyCordBot(bridge.Bot):
@@ -119,18 +129,18 @@ async def ping(ctx):
 async def options(ctx):
     commands_text = textwrap.dedent("""
     /setup_preferences <flavor> <dish> <diet>  • Set or update your preferences
-    /display_preferences                 • Show your saved preferences
-    /clear_preferences                   • Remove your saved preferences
+    /display_preferences                 • Show saved preferences
+    /clear_preferences                   • Remove saved preferences
 
     /recipe <ingredients>                • Generate a recipe
     /save_recipe                         • Save last recipe
     /show_favorites                      • List saved recipes
     /remove_recipe <title>               • Delete a favorite
     /clear_favorites                     • Remove all favorites
-    /rename_recipe <old> <new>           • Rename a favorite recipe
+    /rename_recipe <old> <new>           • Rename a favorite
+    /share_recipe <member> <title>       • Share a favorite via DM
     /export_favorites                    • Download favorites as text file
     /random_recipe                       • Show a random favorite
-    /share_recipe <member> <title>       • Share a favorite via DM
 
     /meal_plan                           • Create a weekly meal plan
     /ask <query>                         • Ask ChatGPT any question
@@ -182,14 +192,14 @@ async def recipe(ctx, *, ingredients: str):
         text = await get_chatgpt_response(query)
     except Exception as e:
         logging.error("Recipe error: %s", e)
-        return await ctx.respond("❗ Error generating recipe.")
+        return await ctx.followup.send("❗ Error generating recipe.")
 
     data['last_query'][uid] = ingredients
     data['last_msg'][uid] = text
     save_data()
 
     for chunk in chunk_by_lines(text):
-        await ctx.send(chunk)
+        await ctx.followup.send(chunk)
 
 @client.bridge_command(description="Save your last generated recipe.")
 async def save_recipe(ctx):
@@ -284,9 +294,7 @@ async def meal_plan(ctx):
     prefs = data['prefs'].get(uid, {})
     favs = data['recipes'].get(uid, {})
 
-    query = (
-        "Create a weekly meal plan (Mon–Sun) with breakfast, lunch, dinner." 
-    )
+    query = ("Create a weekly meal plan (Mon–Sun) with breakfast, lunch, dinner.")
     if prefs:
         pref_str = ", ".join(f"{k}: {v}" for k, v in prefs.items())
         query += f" Consider preferences: {pref_str}."
@@ -299,10 +307,10 @@ async def meal_plan(ctx):
         plan = await get_chatgpt_response(query)
     except Exception as e:
         logging.error("Meal plan error: %s", e)
-        return await ctx.respond("❌ Error generating meal plan.")
+        return await ctx.followup.send("❌ Error generating meal plan.")
 
     for chunk in chunk_by_lines(plan):
-        await ctx.send(chunk)
+        await ctx.followup.send(chunk)
 
 @client.bridge_command(description="Ask ChatGPT any question.")
 async def ask(ctx, *, question: str):
@@ -311,10 +319,11 @@ async def ask(ctx, *, question: str):
         answer = await get_chatgpt_response(question)
     except Exception as e:
         logging.error("Ask error: %s", e)
-        return await ctx.respond("❗ Error processing your question.")
+        return await ctx.followup.send("❗ Error processing your question.")
     for chunk in chunk_by_lines(answer):
-        await ctx.send(chunk)
+        await ctx.followup.send(chunk)
 
+# New utility commands
 @client.bridge_command(description="Set a one-off reminder in seconds.")
 async def remind_me(ctx, seconds: int, *, message: str):
     await ctx.respond(f"⏰ Okay, I'll remind you in {seconds} seconds.")
@@ -322,7 +331,7 @@ async def remind_me(ctx, seconds: int, *, message: str):
     try:
         await ctx.author.send(f"🔔 Reminder: {message}")
     except Exception:
-        await ctx.respond("❗ Couldn't DM you. Do you allow DMs?" )
+        await ctx.followup.send("❗ Couldn't DM you. Please enable DMs to receive reminders.")
 
 @client.bridge_command(description="Tell a random joke.")
 async def joke(ctx):
