@@ -3,272 +3,289 @@ import asyncio
 import os
 import logging
 import textwrap
-import io  # Used for exporting favorites as a file
-import random 
+import io
+import random
+import json
 from discord.ext import bridge
 from dotenv import load_dotenv
 import openai
-from typing import Dict, List
 
+# -------------------- Configuration --------------------
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
 load_dotenv()
 
+DATA_FILE = os.getenv('DATA_FILE', 'bot_data.json')
+
+# Load or initialize persistent storage
+if os.path.exists(DATA_FILE):
+    with open(DATA_FILE, 'r') as f:
+        data = json.load(f)
+else:
+    data = {
+        "prefs": {},            # user_id -> { flavor, dish, diet }
+        "recipes": {},          # user_id -> { title -> recipe_text }
+        "last_query": {},       # user_id -> last ingredients
+        "last_msg": {}          # user_id -> last generated recipe text
+    }
+
+
+def save_data():
+    """Write the current data dict back to disk."""
+    with open(DATA_FILE, 'w') as f:
+        json.dump(data, f, indent=2)
+
+# -------------------- Bot Setup --------------------
 class PyCordBot(bridge.Bot):
-    TOKEN = os.getenv("DISCORD_TOKEN")
+    """Custom Bot class using discord.py Bridge."""
+    TOKEN = os.getenv('DISCORD_TOKEN')
     intents = discord.Intents.all()
 
-client = PyCordBot(intents=PyCordBot.intents, command_prefix="!")
+client = PyCordBot(intents=PyCordBot.intents)
 
-# Store data in-memory with type annotations for clarity
-user_preferences: Dict[str, Dict[str, str]] = {}
-favorite_recipes: Dict[str, Dict[str, str]] = {}
-last_message: Dict[str, str] = {}
-last_query: Dict[str, str] = {}
-
-# Configure OpenAI
+# OpenAI configuration
 openai.api_key = os.getenv('GPT_TOKEN')
-GPT_MODEL = "gpt-4o-mini"  # Update as needed
+GPT_MODEL = os.getenv('GPT_MODEL', 'gpt-4o-mini')
 
-def chunk_by_lines(text: str, max_size: int = 2000) -> List[str]:
+# -------------------- Utilities --------------------
+def chunk_by_lines(text: str, max_size: int = 2000):
     """
-    Splits the text into chunks of up to `max_size` characters without breaking lines.
+    Split `text` into chunks up to max_size characters without breaking lines.
     """
     lines = text.split('\n')
     chunks = []
-    current_chunk = ""
-
+    current = ""
     for line in lines:
-        # If the line itself is too long, break it up.
         while len(line) > max_size:
             chunks.append(line[:max_size])
             line = line[max_size:]
-        if len(current_chunk) + len(line) + 1 <= max_size:
-            current_chunk = line if not current_chunk else current_chunk + "\n" + line
+        if len(current) + len(line) + 1 <= max_size:
+            current = line if not current else current + '\n' + line
         else:
-            chunks.append(current_chunk)
-            current_chunk = line
-
-    if current_chunk:
-        chunks.append(current_chunk)
+            chunks.append(current)
+            current = line
+    if current:
+        chunks.append(current)
     return chunks
 
-@client.listen()
-async def on_ready():
-    logging.info(f"Logged in as {client.user.name}")
-
-@client.bridge_command(description="Ping, pong!")
-async def ping(ctx: bridge.BridgeApplicationContext):
-    # Calculate latency in milliseconds
-    latency = int(client.latency * 1000)
-    await ctx.respond(f"Pong! Bot replied in {latency} ms")
-
-@client.bridge_command(description="Displays commands DishCord bot is capable of")
-async def options(ctx: bridge.BridgeApplicationContext):
-    commands_text = textwrap.dedent("""
-    /setup_preferences <flavor> <dish> <diet> - Set your preferences.
-    /display_preferences - Display your current preferences.
-    /recipe <ingredients> - Generate a recipe based on your ingredients.
-    /save_recipe - Save the most recent recipe to your favorites.
-    /show_favorites - Display all saved recipes.
-    /remove_recipe <title> - Remove a saved recipe.
-    /export_favorites - Export all favorite recipes as a text file.
-    /ask <query> - Ask a question to ChatGPT.
-    /meal_plan - Generate a weekly meal plan based on your preferences and favorites.
-    /random_recipe - Display a random favorite recipe.
-    """)
-    await ctx.respond(commands_text)
-
-@client.bridge_command(description="Setup user preferences")
-async def setup_preferences(ctx: bridge.BridgeApplicationContext, flavor: str, dish: str, diet: str):
-    """Store user preferences for personalized suggestions."""
-    user_id = str(ctx.author.id)
-    user_preferences[user_id] = {"flavor": flavor, "dish": dish, "diet": diet}
-    await ctx.respond(
-        f"Preferences saved!\n**Flavor:** {flavor}\n**Dish:** {dish}\n**Diet:** {diet}"
-    )
-
-@client.bridge_command(description="Display user preferences")
-async def display_preferences(ctx: bridge.BridgeApplicationContext):
-    """Display user preferences."""
-    user_id = str(ctx.author.id)
-    if user_id not in user_preferences:
-        await ctx.respond("You don't have any preferences yet.")
-        return
-
-    prefs = user_preferences[user_id]
-    await ctx.respond(
-        f"Your preferences:\n**Flavor:** {prefs.get('flavor', '')}\n**Dish:** {prefs.get('dish', '')}\n**Diet:** {prefs.get('diet', '')}"
-    )
+async def make_embed(title: str, fields: dict):
+    """Create a Discord Embed from title and a dict of fields."""
+    embed = discord.Embed(title=title, color=discord.Color.blurple())
+    for name, value in fields.items():
+        embed.add_field(name=name, value=value, inline=False)
+    return embed
 
 async def get_chatgpt_response(query: str) -> str:
     """
-    Asynchronously fetch a response from ChatGPT using OpenAI's API.
-    Uses asyncio.to_thread to avoid blocking the event loop.
+    Fetch a response from OpenAI GPT in a thread to avoid blocking.
     """
-    def sync_chat_call() -> str:
-        response = openai.ChatCompletion.create(
+    def sync_call():
+        resp = openai.ChatCompletion.create(
             model=GPT_MODEL,
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": query}
             ]
         )
-        return response.choices[0].message.content
+        return resp.choices[0].message.content
+    return await asyncio.to_thread(sync_call)
 
-    return await asyncio.to_thread(sync_chat_call)
+# -------------------- Events --------------------
+@client.event
+async def on_ready():
+    logging.info(f"Logged in as {client.user} (ID: {client.user.id})")
 
-@client.bridge_command(description="Generate a recipe based on ingredients")
-async def recipe(ctx: bridge.BridgeApplicationContext, *, ingredients: str):
-    """Generate a recipe using the provided ingredients."""
-    await ctx.defer()
-    user_id = str(ctx.author.id)
-    prefs = user_preferences.get(user_id, {"flavor": "", "dish": "", "diet": ""})
-    
-    query = (
-        f"Give me a recipe with the following ingredients: {ingredients}.\n"
-        "If possible, include my personal preferences (only if they naturally fit the recipe). "
-        f"Flavor: {prefs['flavor']}\nDish: {prefs['dish']}\nDiet: {prefs['diet']}\n"
-    )
-
-    try:
-        response_text = await get_chatgpt_response(query)
-    except Exception as e:
-        logging.error("Error fetching recipe: %s", e)
-        await ctx.respond("Sorry, I encountered an error while generating the recipe.")
-        return
-
-    # Save the response for later use (e.g., saving favorites)
-    last_query[user_id] = ingredients
-    last_message[user_id] = response_text
-
-    for chunk in chunk_by_lines(response_text):
-        await ctx.send(chunk)
-
-@client.bridge_command(description="Save a recipe to your favorites")
-async def save_recipe(ctx: bridge.BridgeApplicationContext):
-    """Save the most recent recipe to the user's favorites."""
-    user_id = str(ctx.author.id)
-    if user_id not in last_message:
-        await ctx.respond("No previously generated recipe!")
-        return
-
-    if user_id not in favorite_recipes:
-        favorite_recipes[user_id] = {}
-
-    favorite_recipes[user_id][last_query[user_id]] = last_message[user_id]
-    await ctx.respond("Recipe saved to your favorites!")
-
-@client.bridge_command(description="Show all your favorite recipes")
-async def show_favorites(ctx: bridge.BridgeApplicationContext):
-    """Display all saved favorite recipes."""
-    user_id = str(ctx.author.id)
-    if user_id in favorite_recipes and favorite_recipes[user_id]:
-        recipe_titles = "\n".join(f"- {title}" for title in favorite_recipes[user_id].keys())
-        await ctx.respond(f"Your favorite recipes:\n{recipe_titles}")
+@client.event
+async def on_application_command_error(ctx, error):
+    if isinstance(error, bridge.MissingRequiredArgument):
+        await ctx.respond("❗ Missing argument. Check command usage.")
     else:
-        await ctx.respond("You don't have any favorite recipes yet.")
+        logging.exception(error)
+        await ctx.respond("❗ An unexpected error occurred. The issue has been logged.")
 
-@client.bridge_command(description="Remove a favorite recipe")
-async def remove_recipe(ctx: bridge.BridgeApplicationContext, *, title: str):
-    """Remove a saved favorite recipe using the recipe title."""
-    user_id = str(ctx.author.id)
-    if user_id not in favorite_recipes or not favorite_recipes[user_id]:
-        await ctx.respond("You don't have any favorite recipes yet.")
-        return
+# -------------------- Commands --------------------
+@client.bridge_command(description="Ping the bot and get latency.")
+async def ping(ctx):
+    latency_ms = int(client.latency * 1000)
+    await ctx.respond(f"Pong! 🏓 Latency: {latency_ms}ms")
 
-    if title in favorite_recipes[user_id]:
-        del favorite_recipes[user_id][title]
-        await ctx.respond(f"Removed favorite recipe: {title}")
+@client.bridge_command(description="List available commands.")
+async def options(ctx):
+    commands_text = textwrap.dedent("""
+    /setup_preferences <flavor> <dish> <diet>  • Set or update your preferences
+    /display_preferences                 • Show your saved preferences
+    /clear_preferences                   • Remove your saved preferences
+
+    /recipe <ingredients>                • Generate a recipe
+    /save_recipe                         • Save last recipe
+    /show_favorites                      • List saved recipes
+    /remove_recipe <title>               • Delete a favorite
+    /clear_favorites                     • Remove all favorites
+    /export_favorites                    • Download favorites as text file
+    /random_recipe                       • Show a random favorite
+
+    /meal_plan                           • Create a weekly meal plan
+    /ask <query>                         • Ask ChatGPT any question
+    """)
+    await ctx.respond(f"```\n{commands_text}```")
+
+# Preferences
+@client.bridge_command(description="Save or update your flavor/dish/diet preferences.")
+async def setup_preferences(ctx, flavor: str, dish: str, diet: str):
+    uid = str(ctx.author.id)
+    data['prefs'][uid] = {'Flavor': flavor, 'Dish': dish, 'Diet': diet}
+    save_data()
+    embed = await make_embed("✅ Preferences Saved", data['prefs'][uid])
+    await ctx.respond(embed=embed)
+
+@client.bridge_command(description="Show your current preferences.")
+async def display_preferences(ctx):
+    uid = str(ctx.author.id)
+    prefs = data['prefs'].get(uid)
+    if not prefs:
+        return await ctx.respond("You have no preferences set. Use /setup_preferences.")
+    embed = await make_embed("📝 Your Preferences", prefs)
+    await ctx.respond(embed=embed)
+
+@client.bridge_command(description="Clear your saved preferences.")
+async def clear_preferences(ctx):
+    uid = str(ctx.author.id)
+    if data['prefs'].pop(uid, None):
+        save_data()
+        await ctx.respond("✅ Preferences cleared.")
     else:
-        await ctx.respond("No favorite recipe found with that title!")
+        await ctx.respond("You had no preferences to clear.")
 
-@client.bridge_command(description="Export your favorite recipes to a text file")
-async def export_favorites(ctx: bridge.BridgeApplicationContext):
-    """Export all your saved favorite recipes as a text file attachment."""
-    user_id = str(ctx.author.id)
-    if user_id not in favorite_recipes or not favorite_recipes[user_id]:
-        await ctx.respond("You don't have any favorite recipes to export!")
-        return
-
-    output = io.StringIO()
-    output.write("Favorite Recipes:\n")
-    output.write("=" * 40 + "\n\n")
-    for title, recipe in favorite_recipes[user_id].items():
-        output.write(f"Recipe: {title}\n{'-' * 20}\n{recipe}\n\n")
-    output.seek(0)
-
-    file = discord.File(fp=output, filename="favorite_recipes.txt")
-    await ctx.respond("Here are your exported favorite recipes:", file=file)
-
-@client.bridge_command(description="Display a random favorite recipe")
-async def random_recipe(ctx: bridge.BridgeApplicationContext):
-    """Fetch a random recipe from your favorites and display it."""
-    user_id = str(ctx.author.id)
-    if user_id not in favorite_recipes or not favorite_recipes[user_id]:
-        await ctx.respond("You don't have any favorite recipes to choose from!")
-        return
-    # Choose a random favorite recipe
-    recipe_title = random.choice(list(favorite_recipes[user_id].keys()))
-    recipe_content = favorite_recipes[user_id][recipe_title]
-    await ctx.respond(f"Here's a random favorite recipe for you:\n**{recipe_title}**\n{recipe_content}")
-
-@client.bridge_command(description="Generate a weekly meal plan based on your preferences and favorites")
-async def meal_plan(ctx: bridge.BridgeApplicationContext):
-    """Generate a weekly meal plan for the upcoming week, including breakfast, lunch, and dinner for each day, plus a grocery list."""
+# Recipe management
+@client.bridge_command(description="Generate a recipe from ingredients.")
+async def recipe(ctx, *, ingredients: str):
     await ctx.defer()
-    user_id = str(ctx.author.id)
-    prefs = user_preferences.get(user_id, {"flavor": "", "dish": "", "diet": ""})
-    favorites = favorite_recipes.get(user_id, {})
+    uid = str(ctx.author.id)
+    prefs = data['prefs'].get(uid, {})
 
-    query = (
-        "Create a detailed weekly meal plan for the upcoming week (Monday to Sunday). "
-        "Each day should include recipes for breakfast, lunch, and dinner. "
-    )
-    
+    query = f"Create a recipe using: {ingredients}."
     if prefs:
-        query += (
-            f"Consider the following user preferences: Flavor: {prefs.get('flavor', '')}, "
-            f"Dish: {prefs.get('dish', '')}, Diet: {prefs.get('diet', '')}. "
-        )
-    
-    if favorites:
-        # List favorite recipe titles to incorporate if they fit naturally
-        favorite_list = "\n".join(f"- {title}" for title in favorites.keys())
-        query += (
-            "If possible, incorporate the following favorite recipes where appropriate:\n"
-            f"{favorite_list}\n"
-        )
-    
-    query += "At the end, include a consolidated grocery shopping list for the week."
+        pref_list = ", ".join(f"{k}: {v}" for k, v in prefs.items())
+        query += f"\nConsider these preferences: {pref_list}."
 
     try:
-        response_text = await get_chatgpt_response(query)
+        text = await get_chatgpt_response(query)
     except Exception as e:
-        logging.error("Error generating meal plan: %s", e)
-        await ctx.respond("Sorry, I encountered an error while generating your meal plan.")
-        return
+        logging.error("Recipe error: %s", e)
+        return await ctx.respond("❗ Error generating recipe.")
 
-    for chunk in chunk_by_lines(response_text):
+    data['last_query'][uid] = ingredients
+    data['last_msg'][uid] = text
+    save_data()
+
+    for chunk in chunk_by_lines(text):
         await ctx.send(chunk)
 
-@client.bridge_command(description="Ask a question to ChatGPT")
-async def ask(ctx: bridge.BridgeApplicationContext, *, query: str):
-    """Ask a question to ChatGPT and get a response."""
+@client.bridge_command(description="Save your last generated recipe.")
+async def save_recipe(ctx):
+    uid = str(ctx.author.id)
+    title = data['last_query'].get(uid)
+    text = data['last_msg'].get(uid)
+    if not title or not text:
+        return await ctx.respond("No recent recipe to save.")
+
+    data['recipes'].setdefault(uid, {})[title] = text
+    save_data()
+    await ctx.respond(f"✅ Saved recipe: **{title}**")
+
+@client.bridge_command(description="List your saved favorite recipes.")
+async def show_favorites(ctx):
+    uid = str(ctx.author.id)
+    favs = data['recipes'].get(uid, {})
+    if not favs:
+        return await ctx.respond("You have no favorite recipes.")
+    titles = "\n".join(f"• {t}" for t in favs)
+    await ctx.respond(f"**Your Favorites:**\n{titles}")
+
+@client.bridge_command(description="Remove one favorite recipe.")
+async def remove_recipe(ctx, *, title: str):
+    uid = str(ctx.author.id)
+    if data['recipes'].get(uid, {}).pop(title, None):
+        save_data()
+        await ctx.respond(f"✓ Removed: **{title}**")
+    else:
+        await ctx.respond("Recipe not found in your favorites.")
+
+@client.bridge_command(description="Clear all favorite recipes.")
+async def clear_favorites(ctx):
+    uid = str(ctx.author.id)
+    if data['recipes'].pop(uid, None) is not None:
+        save_data()
+        await ctx.respond("✅ All favorites cleared.")
+    else:
+        await ctx.respond("You had no favorites to clear.")
+
+@client.bridge_command(description="Export favorites as a text file.")
+async def export_favorites(ctx):
+    uid = str(ctx.author.id)
+    favs = data['recipes'].get(uid)
+    if not favs:
+        return await ctx.respond("You have no favorites to export.")
+
+    buf = io.StringIO()
+    buf.write("Your Favorite Recipes:\n\n")
+    for title, txt in favs.items():
+        buf.write(f"== {title} ==\n{txt}\n\n")
+    buf.seek(0)
+
+    await ctx.send("📄 Here is your favorites file:", file=discord.File(buf, "favorites.txt"))
+
+@client.bridge_command(description="Show a random favorite recipe.")
+async def random_recipe(ctx):
+    uid = str(ctx.author.id)
+    favs = data['recipes'].get(uid, {})
+    if not favs:
+        return await ctx.respond("No favorites to choose from.")
+    title = random.choice(list(favs))
+    await ctx.respond(f"🎲 **{title}**\n{favs[title]}")
+
+# Meal plan & general ask
+@client.bridge_command(description="Generate a weekly meal plan.")
+async def meal_plan(ctx):
+    await ctx.defer()
+    uid = str(ctx.author.id)
+    prefs = data['prefs'].get(uid, {})
+    favs = data['recipes'].get(uid, {})
+
+    query = (
+        "Create a weekly meal plan (Mon–Sun) with breakfast, lunch, dinner."
+    )
+    if prefs:
+        pref_str = ", ".join(f"{k}: {v}" for k, v in prefs.items())
+        query += f" Consider preferences: {pref_str}."
+    if favs:
+        fav_list = ", ".join(favs.keys())
+        query += f" Include favorite recipes when possible: {fav_list}."
+    query += " Provide a consolidated grocery list at the end."
+
+    try:
+        plan = await get_chatgpt_response(query)
+    except Exception as e:
+        logging.error("Meal plan error: %s", e)
+        return await ctx.respond("❌ Error generating meal plan.")
+
+    for chunk in chunk_by_lines(plan):
+        await ctx.send(chunk)
+
+@client.bridge_command(description="Ask ChatGPT any question.")
+async def ask(ctx, *, question: str):
     await ctx.defer()
     try:
-        response_text = await get_chatgpt_response(query)
+        answer = await get_chatgpt_response(question)
     except Exception as e:
-        logging.error("Error fetching answer: %s", e)
-        await ctx.respond("Sorry, I encountered an error while processing your question.")
-        return
-
-    for chunk in chunk_by_lines(response_text):
+        logging.error("Ask error: %s", e)
+        return await ctx.respond("❗ Error processing your question.")
+    for chunk in chunk_by_lines(answer):
         await ctx.send(chunk)
 
+# -------------------- Main --------------------
 async def main_bot():
-    logging.info("Bot is starting...")
-    await client.start(client.TOKEN)
+    logging.info("Starting bot...")
+    await client.start(PyCordBot.TOKEN)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     asyncio.run(main_bot())
