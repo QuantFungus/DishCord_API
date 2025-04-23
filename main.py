@@ -1083,6 +1083,28 @@ async def unit_converter(ctx, quantity: float, from_unit: str, to_unit: str):
         print(f"Error during unit conversion: {e}")
         await ctx.respond("Sorry, I encountered an error trying to convert those units.")
 
+@client.bridge_command(description="Scale a recipe to a different serving size")
+async def scale_recipe(ctx, original_servings: int, target_servings: int, *, recipe: str):
+    """Adjusts the ingredient quantities in a recipe for a different number of servings."""
+    await ctx.defer()
+
+    if original_servings <= 0 or target_servings <= 0:
+        await ctx.respond("Serving sizes must be positive numbers.")
+        return
+
+    query = (
+        f"Scale the following recipe from {original_servings} servings to {target_servings} servings. "
+        "Adjust only the ingredient quantities proportionally. Keep the instructions the same.\n\n"
+        f"Recipe:\n{recipe}"
+    )
+
+    try:
+        response = await get_chatgpt_response(query)
+        await ctx.respond(f"Recipe scaled for {target_servings} servings:\n{response}")
+    except Exception as e:
+        print(f"Error during recipe scaling: {e}")
+        await ctx.respond("Sorry, I encountered an error trying to scale the recipe.")
+
 @client.bridge_command(description="Suggest a seasonal recipe")
 async def seasonal_recipe(ctx):
     """Suggest recipes using produce in season for the current month."""
