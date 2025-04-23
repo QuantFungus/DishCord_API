@@ -1065,9 +1065,24 @@ async def bookmark_recipe(ctx, recipe: str, *, tags: str = ""):
         if user_id not in recipe_tags:
             recipe_tags[user_id] = {}
         recipe_tags[user_id][recipe] = tag_list
-
     await ctx.respond(f"Recipe bookmarked! Tags: {tags if tags else 'None'}")
-    
+
+@client.bridge_command(description="Convert between kitchen units")
+async def unit_converter(ctx, quantity: float, from_unit: str, to_unit: str):
+    """Converts a quantity from one kitchen unit to another."""
+    await ctx.defer()
+    query = (
+        f"Convert {quantity} {from_unit} to {to_unit}. "
+        "Provide only the resulting quantity and unit, or state if the conversion is not standard/possible. "
+        "Focus on common kitchen measurements (volume, weight)."
+    )
+    try:
+        response = await get_chatgpt_response(query)
+        await ctx.respond(f"Conversion Result: {response}")
+    except Exception as e:
+        print(f"Error during unit conversion: {e}")
+        await ctx.respond("Sorry, I encountered an error trying to convert those units.")
+
 @client.bridge_command(description="Suggest a seasonal recipe")
 async def seasonal_recipe(ctx):
     """Suggest recipes using produce in season for the current month."""
