@@ -6,6 +6,7 @@ import logging
 import textwrap
 import difflib 
 from discord.ext import bridge, commands
+from discord.ui import View, Select
 from dotenv import load_dotenv
 from openai import OpenAI
 
@@ -149,27 +150,47 @@ async def show_favorites(ctx):
 
 @client.bridge_command(description="View a specific saved recipe by name")
 async def view_favorite(ctx, *, recipe_name: str):
-    """View the full content of a saved recipe using fuzzy matching on the name/query."""
+    """View the full content of a saved recipe using fuzzy matching and dropdown UI."""
     user_id = str(ctx.author.id)
 
     if user_id not in favorite_recipes or not favorite_recipes[user_id]:
         await ctx.respond("You have no saved recipes.")
         return
 
-    # Fuzzy match the query to saved recipe keys
-    matches = difflib.get_close_matches(recipe_name, favorite_recipes[user_id].keys(), n=1, cutoff=0.4)
+    # Get multiple close matches
+    matches = difflib.get_close_matches(recipe_name, favorite_recipes[user_id].keys(), n=5, cutoff=0.3)
 
     if not matches:
         await ctx.respond(f"No saved recipe found matching: **{recipe_name}**")
         return
 
-    # Retrieve and format the matched recipe
-    recipe = favorite_recipes[user_id][matches[0]]
-    response = f"**{matches[0]}**\n\n{recipe}"
+    if len(matches) == 1:
+        # If only one match, return immediately
+        recipe = favorite_recipes[user_id][matches[0]]
+        response = f"**{matches[0]}**\n\n{recipe}"
+        for i in range(0, len(response), 2000):
+            await ctx.send(response[i:i+2000])
+        return
 
-    # Send in chunks if it's too long
-    for i in range(0, len(response), 2000):
-        await ctx.send(response[i:i+2000])
+    # Multiple matches — use dropdown
+    class RecipeSelect(Select):
+        def __init__(self):
+            options = [
+                discord.SelectOption(label=title[:100], description="Click to view this recipe") for title in matches
+            ]
+            super().__init__(placeholder="Choose a recipe to view", options=options, min_values=1, max_values=1)
+
+        async def callback(self, interaction: discord.Interaction):
+            selected_title = self.values[0]
+            selected_recipe = favorite_recipes[user_id][selected_title]
+            content = f"**{selected_title}**\n\n{selected_recipe}"
+
+            for i in range(0, len(content), 2000):
+                await interaction.response.send_message(content[i:i+2000], ephemeral=True)
+
+    view = View()
+    view.add_item(RecipeSelect())
+    await ctx.respond("Multiple recipes found. Please choose one below:", view=view)
 
 @client.bridge_command(description="Recommend a recipe related to input")
 async def recommend(ctx, recipe: str):
