@@ -334,22 +334,32 @@ async def recipe_battle(ctx, opponent: discord.Member):
 
     await ctx.respond("Battle initiated! React with 🅰️ or 🅱️ to vote!")
 
-@client.bridge_command(description="Get a surprise recipe from your saved favorites")
-async def surprise_me(ctx):
-    """Send a random recipe from the user's saved favorites."""
+@client.bridge_command(description="Get a surprise recipe from your favorites with optional filters")
+async def surprise_me(ctx, diet: str = "", keyword: str = ""):
+    """Send a random recipe from saved favorites with optional filters."""
     await ctx.defer()
     user_id = str(ctx.author.id)
 
     if user_id not in favorite_recipes or not favorite_recipes[user_id]:
-        await ctx.respond("You don't have any favorite recipes yet to surprise you with.")
+        await ctx.respond("You don't have any favorite recipes yet.")
         return
 
-    # Pick a random recipe from the user's favorites
-    recipe_name = random.choice(list(favorite_recipes[user_id].keys()))
-    recipe = favorite_recipes[user_id][recipe_name]
-    response = f"🎲 **Surprise Recipe:** {recipe_name}\n\n{recipe}"
+    filtered = []
 
-    # Chunk if needed
+    for title, recipe in favorite_recipes[user_id].items():
+        match_diet = diet.lower() in recipe.lower() if diet else True
+        match_keyword = keyword.lower() in title.lower() if keyword else True
+
+        if match_diet and match_keyword:
+            filtered.append((title, recipe))
+
+    if not filtered:
+        await ctx.respond("No matching recipes found with those filters.")
+        return
+
+    title, recipe = random.choice(filtered)
+    response = f"🎲 **Surprise Recipe:** {title}\n\n{recipe}"
+
     for i in range(0, len(response), 2000):
         await ctx.send(response[i:i+2000])
 
