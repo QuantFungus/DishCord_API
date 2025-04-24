@@ -19,6 +19,7 @@ class PyCordBot(bridge.Bot):
 client = PyCordBot(intents=PyCordBot.intents, command_prefix="!")
 user_preferences = {}  # Store user preferences in-memory
 favorite_recipes = {}  # Store users' favorite recipes
+recipe_reviews = {}  # Store reviews per user
 last_message = {}  # Stores last message for purpose of storing recipe
 last_query = {}  # Stores last query for purpose of storing recipe
 name = {} # Just here for testing
@@ -231,6 +232,28 @@ async def roulette(ctx, diet: str = "", max_calories: int = 0):
 
     for i in range(0, len(response), 2000):
         await ctx.send(response[i:i+2000])
+
+@client.bridge_command(description="Rate the last recipe you received")
+async def rate_recipe(ctx, stars: int, *, review: str = ""):
+    """Rate the last recipe with 1–5 stars and an optional review."""
+    await ctx.defer()
+    user_id = str(ctx.author.id)
+
+    if stars < 1 or stars > 5:
+        await ctx.respond("Please rate between 1 and 5 stars.")
+        return
+    if user_id not in last_message:
+        await ctx.respond("You haven't generated a recipe yet!")
+        return
+
+    entry = {
+        "stars": stars,
+        "review": review,
+        "recipe": last_message[user_id],
+        "query": last_query[user_id]
+    }
+    recipe_reviews[user_id] = entry
+    await ctx.respond(f"Thanks for rating! ⭐ {stars}/5\nYour review: {review or '(none)'}")
 
 def get_chatgpt_response(query: str) -> str:
     
