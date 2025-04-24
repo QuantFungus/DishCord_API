@@ -146,6 +146,28 @@ async def show_favorites(ctx):
     else:
         await ctx.respond(response)
 
+@client.bridge_command(description="View a specific saved recipe by name")
+async def view_favorite(ctx, *, recipe_name: str):
+    """View the full content of a saved recipe using the original name/query."""
+    user_id = str(ctx.author.id)
+
+    if user_id not in favorite_recipes or not favorite_recipes[user_id]:
+        await ctx.respond("You have no saved recipes.")
+        return
+
+    matching_keys = [key for key in favorite_recipes[user_id] if recipe_name.lower() in key.lower()]
+
+    if not matching_keys:
+        await ctx.respond(f"No saved recipe found matching: **{recipe_name}**")
+        return
+
+    # Show the first match
+    recipe = favorite_recipes[user_id][matching_keys[0]]
+    response = f"**{matching_keys[0]}**\n\n{recipe}"
+
+    # Respond in chunks if it's too long
+    for i in range(0, len(response), 2000):
+        await ctx.send(response[i:i+2000])
 
 @client.bridge_command(description="Recommend a recipe related to input")
 async def recommend(ctx, recipe: str):
