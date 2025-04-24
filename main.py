@@ -120,19 +120,32 @@ async def save_recipe(ctx):
         await ctx.respond("No previously generated recipe!")
 
     if user_id not in favorite_recipes:
-        favorite_recipes[user_id] = []
+        favorite_recipes[user_id] = {}
     favorite_recipes[user_id][last_query[user_id]] = last_message[user_id]
+
     await ctx.respond(f"Recipe saved to your favorites!")
 
 @client.bridge_command(description="Show all your favorite recipes")
 async def show_favorites(ctx):
     """Display all the favorite recipes of the user."""
     user_id = str(ctx.author.id)
-    if user_id in favorite_recipes and favorite_recipes[user_id]:
-        recipes = favorite_recipes[user_id].keys()
-        await ctx.respond(f"Your favorite recipes:\n{recipes}")
-    else:
+
+    if user_id not in favorite_recipes or not favorite_recipes[user_id]:
         await ctx.respond("You don't have any favorite recipes yet.")
+        return
+
+    response = "**Your Favorite Recipes:**\n"
+    for i, (title, recipe) in enumerate(favorite_recipes[user_id].items(), 1):
+        response += f"**{i}. {title}**\n"
+
+    # Chunk the response if too long
+    if len(response) > 2000:
+        chunks = [response[i:i+2000] for i in range(0, len(response), 2000)]
+        for chunk in chunks:
+            await ctx.send(chunk)
+    else:
+        await ctx.respond(response)
+
 
 @client.bridge_command(description="Recommend a recipe related to input")
 async def recommend(ctx, recipe: str):
