@@ -334,6 +334,25 @@ async def recipe_battle(ctx, opponent: discord.Member):
 
     await ctx.respond("Battle initiated! React with 🅰️ or 🅱️ to vote!")
 
+@client.bridge_command(description="Get a surprise recipe from your saved favorites")
+async def surprise_me(ctx):
+    """Send a random recipe from the user's saved favorites."""
+    await ctx.defer()
+    user_id = str(ctx.author.id)
+
+    if user_id not in favorite_recipes or not favorite_recipes[user_id]:
+        await ctx.respond("You don't have any favorite recipes yet to surprise you with.")
+        return
+
+    # Pick a random recipe from the user's favorites
+    recipe_name = random.choice(list(favorite_recipes[user_id].keys()))
+    recipe = favorite_recipes[user_id][recipe_name]
+    response = f"🎲 **Surprise Recipe:** {recipe_name}\n\n{recipe}"
+
+    # Chunk if needed
+    for i in range(0, len(response), 2000):
+        await ctx.send(response[i:i+2000])
+
 def get_chatgpt_response(query: str) -> str:
     
     completion = GPTclient.chat.completions.create(
