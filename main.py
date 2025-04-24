@@ -4,7 +4,9 @@ import os
 import random
 import logging
 import textwrap
+import difflib 
 from discord.ext import bridge, commands
+from discord.ui import View, Select
 from dotenv import load_dotenv
 from openai import OpenAI
 
@@ -19,6 +21,7 @@ class PyCordBot(bridge.Bot):
 client = PyCordBot(intents=PyCordBot.intents, command_prefix="!")
 user_preferences = {}  # Store user preferences in-memory
 favorite_recipes = {}  # Store users' favorite recipes
+recipe_reviews = {}  # Store reviews per user
 last_message = {}  # Stores last message for purpose of storing recipe
 last_query = {}  # Stores last query for purpose of storing recipe
 name = {} # Just here for testing
@@ -38,9 +41,15 @@ async def ping(ctx):
 async def options(ctx):
     commands = textwrap.dedent("""
     /setup_preferences <flavor> <dish> <diet> - Set your preferences.
-    /recipe <ingredients> [--quick] [--meal_prep] - Generate a recipe.
-    /save_recipe - Save the most recent recipe to your favorites.
+    /display_preferences - View your saved preferences.
+    /recipe <ingredients> - Generate a recipe using ingredients.
+    /recommend <dish idea> - Generate a recipe from a concept.
+    /save_recipe - Save your most recent recipe.
     /show_favorites - Display all saved recipes.
+    /view_favorite <name> - Retrieve a saved recipe using fuzzy search.
+    /surprise_me [filters] - Get a random recipe with optional filters.
+    /rate_recipe <stars> <review> - Rate your last recipe.
+    /recipe_battle @user - Battle recipes with another user!
     """)
     await ctx.respond(commands)
 
@@ -62,6 +71,7 @@ async def display_preferences(ctx):
 
     if not user_id in user_preferences:
         await ctx.respond("You don't have any preferences yet.")
+        return
 
     flavor: str = user_preferences[user_id]["flavor"]
     dish: str = user_preferences[user_id]["favorite_dish"]
@@ -96,7 +106,7 @@ async def recipe(ctx, *, ingredients: str):
     Ensure the response is **under 2000 characters** and uses **Markdown formatting**.
     """
     
-    response = get_chatgpt_response(query)
+    response = await get_chatgpt_response(query)
     user_id = str(ctx.author.id)
     last_query[user_id] = ingredients
     last_message[user_id] = response
@@ -119,19 +129,75 @@ async def save_recipe(ctx):
         await ctx.respond("No previously generated recipe!")
 
     if user_id not in favorite_recipes:
-        favorite_recipes[user_id] = []
+        favorite_recipes[user_id] = {}
     favorite_recipes[user_id][last_query[user_id]] = last_message[user_id]
+
     await ctx.respond(f"Recipe saved to your favorites!")
 
 @client.bridge_command(description="Show all your favorite recipes")
 async def show_favorites(ctx):
     """Display all the favorite recipes of the user."""
     user_id = str(ctx.author.id)
-    if user_id in favorite_recipes and favorite_recipes[user_id]:
-        recipes = favorite_recipes[user_id].keys()
-        await ctx.respond(f"Your favorite recipes:\n{recipes}")
-    else:
+
+    if user_id not in favorite_recipes or not favorite_recipes[user_id]:
         await ctx.respond("You don't have any favorite recipes yet.")
+        return
+
+    response = "**Your Favorite Recipes:**\n"
+    for i, (title, recipe) in enumerate(favorite_recipes[user_id].items(), 1):
+        response += f"**{i}. {title}**\n"
+
+    # Chunk the response if too long
+    if len(response) > 2000:
+        chunks = [response[i:i+2000] for i in range(0, len(response), 2000)]
+        for chunk in chunks:
+            await ctx.send(chunk)
+    else:
+        await ctx.respond(response)
+
+@client.bridge_command(description="View a specific saved recipe by name")
+async def view_favorite(ctx, *, recipe_name: str):
+    """View the full content of a saved recipe using fuzzy matching and dropdown UI."""
+    user_id = str(ctx.author.id)
+
+    if user_id not in favorite_recipes or not favorite_recipes[user_id]:
+        await ctx.respond("You have no saved recipes.")
+        return
+
+    # Get multiple close matches
+    matches = difflib.get_close_matches(recipe_name, favorite_recipes[user_id].keys(), n=5, cutoff=0.3)
+
+    if not matches:
+        await ctx.respond(f"No saved recipe found matching: **{recipe_name}**")
+        return
+
+    if len(matches) == 1:
+        # If only one match, return immediately
+        recipe = favorite_recipes[user_id][matches[0]]
+        response = f"**{matches[0]}**\n\n{recipe}"
+        for i in range(0, len(response), 2000):
+            await ctx.send(response[i:i+2000])
+        return
+
+    # Multiple matches — use dropdown
+    class RecipeSelect(Select):
+        def __init__(self):
+            options = [
+                discord.SelectOption(label=title[:100], description="Click to view this recipe") for title in matches
+            ]
+            super().__init__(placeholder="Choose a recipe to view", options=options, min_values=1, max_values=1)
+
+        async def callback(self, interaction: discord.Interaction):
+            selected_title = self.values[0]
+            selected_recipe = favorite_recipes[user_id][selected_title]
+            content = f"**{selected_title}**\n\n{selected_recipe}"
+
+            for i in range(0, len(content), 2000):
+                await interaction.response.send_message(content[i:i+2000], ephemeral=True)
+
+    view = View()
+    view.add_item(RecipeSelect())
+    await ctx.respond("Multiple recipes found. Please choose one below:", view=view)
 
 @client.bridge_command(description="Recommend a recipe related to input")
 async def recommend(ctx, recipe: str):
@@ -203,17 +269,151 @@ async def ask(ctx, *, query: str):
     for i in range(0, len(response), 2000):
         await ctx.send(response[i:i+2000])
 
+@client.bridge_command(description="Try a totally random recipe!")
+async def roulette(ctx, diet: str = "", max_calories: int = 0):
+    """Generate a random recipe with optional dietary or calorie filters."""
+    await ctx.defer()
+
+    filters = ""
+    if diet:
+        filters += f"Dietary restriction: {diet}. "
+    if max_calories > 0:
+        filters += f"Recipe should be under {max_calories} calories. "
+
+    query = f"""
+    Give me a completely random but interesting recipe. {filters}
+    Make sure to follow this format:
+    - **Dish Name**
+    - **Ingredients**
+    - **Instructions**
+    - **Calories + macros** (estimate if possible)
+    Keep it under 2000 characters and format using Markdown.
+    """
+
+    response = get_chatgpt_response(query)
+    user_id = str(ctx.author.id)
+    last_query[user_id] = f"roulette ({filters.strip()})"
+    last_message[user_id] = response
+
+    for i in range(0, len(response), 2000):
+        await ctx.send(response[i:i+2000])
+
+@client.bridge_command(description="Rate the last recipe you received")
+async def rate_recipe(ctx, stars: int, *, review: str = ""):
+    """Rate the last recipe with 1–5 stars and an optional review."""
+    await ctx.defer()
+    user_id = str(ctx.author.id)
+
+    if stars < 1 or stars > 5:
+        await ctx.respond("Please rate between 1 and 5 stars.")
+        return
+    if user_id not in last_message:
+        await ctx.respond("You haven't generated a recipe yet!")
+        return
+
+    entry = {
+        "stars": stars,
+        "review": review,
+        "recipe": last_message[user_id],
+        "query": last_query[user_id]
+    }
+    recipe_reviews[user_id] = entry
+    await ctx.respond(f"Thanks for rating! ⭐ {stars}/5\nYour review: {review or '(none)'}")
+
+@client.bridge_command(description="Battle your last recipe with another user's recipe")
+async def recipe_battle(ctx, opponent: discord.Member):
+    """Compare your last recipe with another user's and let others vote."""
+    await ctx.defer()
+    user_id = str(ctx.author.id)
+    opp_id = str(opponent.id)
+
+    if user_id not in last_message or opp_id not in last_message:
+        await ctx.respond("Both users need to have generated a recipe first!")
+        return
+
+    embed = discord.Embed(title="🍽️ Recipe Battle!", description="React to vote for the best recipe!")
+    embed.add_field(name=f"{ctx.author.display_name}'s Recipe", value=last_message[user_id][:1000], inline=False)
+    embed.add_field(name=f"{opponent.display_name}'s Recipe", value=last_message[opp_id][:1000], inline=False)
+    msg = await ctx.send(embed=embed)
+
+    await msg.add_reaction("🅰️")
+    await msg.add_reaction("🅱️")
+
+    await ctx.respond("Battle initiated! React with 🅰️ or 🅱️ to vote!")
+
+@client.bridge_command(description="Get a surprise recipe with optional filters like diet, keyword, calories, or time")
+async def surprise_me(
+    ctx,
+    diet: str = "",
+    keyword: str = "",
+    max_calories: int = 0,
+    max_prep_time: int = 0
+):
+    """Send a random saved recipe with optional filters."""
+    await ctx.defer()
+    user_id = str(ctx.author.id)
+
+    if user_id not in favorite_recipes or not favorite_recipes[user_id]:
+        await ctx.respond("You don't have any favorite recipes yet.")
+        return
+
+    filtered = []
+
+    for title, recipe in favorite_recipes[user_id].items():
+        # Check for each filter
+        match_diet = diet.lower() in recipe.lower() if diet else True
+        match_keyword = keyword.lower() in title.lower() if keyword else True
+        match_calories = True
+        match_time = True
+
+        # Parse for calorie info (e.g., "Calories: 430")
+        if max_calories:
+            lines = recipe.lower().splitlines()
+            for line in lines:
+                if "calories" in line:
+                    try:
+                        cal = int("".join(filter(str.isdigit, line)))
+                        match_calories = cal <= max_calories
+                    except:
+                        pass
+
+        # Parse for prep time (e.g., "Prep time: 20 minutes" or "20 mins")
+        if max_prep_time:
+            for line in recipe.lower().splitlines():
+                if "prep" in line or "time" in line:
+                    try:
+                        minutes = int("".join(filter(str.isdigit, line)))
+                        match_time = minutes <= max_prep_time
+                    except:
+                        pass
+
+        if match_diet and match_keyword and match_calories and match_time:
+            filtered.append((title, recipe))
+
+    if not filtered:
+        await ctx.respond("No recipes found matching your filters.")
+        return
+
+    title, recipe = random.choice(filtered)
+    response = f"🎲 **Surprise Recipe:** {title}\n\n{recipe}"
+
+    for i in range(0, len(response), 2000):
+        await ctx.send(response[i:i+2000])
+
 def get_chatgpt_response(query: str) -> str:
     
-    completion = GPTclient.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": query}
-        ]
-    )
-
-    return completion.choices[0].message.content
+    try:
+        completion = GPTclient.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": query}
+            ]
+        )
+        return completion.choices[0].message.content
+    except Exception as e:
+        logging.error(f"ChatGPT API error: {e}")
+        return "An error occurred while generating the recipe. Please try again."
 
 async def main_bot():
     print("Bot is starting...")
