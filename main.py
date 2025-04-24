@@ -41,9 +41,15 @@ async def ping(ctx):
 async def options(ctx):
     commands = textwrap.dedent("""
     /setup_preferences <flavor> <dish> <diet> - Set your preferences.
-    /recipe <ingredients> [--quick] [--meal_prep] - Generate a recipe.
-    /save_recipe - Save the most recent recipe to your favorites.
+    /display_preferences - View your saved preferences.
+    /recipe <ingredients> - Generate a recipe using ingredients.
+    /recommend <dish idea> - Generate a recipe from a concept.
+    /save_recipe - Save your most recent recipe.
     /show_favorites - Display all saved recipes.
+    /view_favorite <name> - Retrieve a saved recipe using fuzzy search.
+    /surprise_me [filters] - Get a random recipe with optional filters.
+    /rate_recipe <stars> <review> - Rate your last recipe.
+    /recipe_battle @user - Battle recipes with another user!
     """)
     await ctx.respond(commands)
 
@@ -65,6 +71,7 @@ async def display_preferences(ctx):
 
     if not user_id in user_preferences:
         await ctx.respond("You don't have any preferences yet.")
+        return
 
     flavor: str = user_preferences[user_id]["flavor"]
     dish: str = user_preferences[user_id]["favorite_dish"]
@@ -99,7 +106,7 @@ async def recipe(ctx, *, ingredients: str):
     Ensure the response is **under 2000 characters** and uses **Markdown formatting**.
     """
     
-    response = get_chatgpt_response(query)
+    response = await get_chatgpt_response(query)
     user_id = str(ctx.author.id)
     last_query[user_id] = ingredients
     last_message[user_id] = response
@@ -395,15 +402,18 @@ async def surprise_me(
 
 def get_chatgpt_response(query: str) -> str:
     
-    completion = GPTclient.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": query}
-        ]
-    )
-
-    return completion.choices[0].message.content
+    try:
+        completion = GPTclient.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": query}
+            ]
+        )
+        return completion.choices[0].message.content
+    except Exception as e:
+        logging.error(f"ChatGPT API error: {e}")
+        return "An error occurred while generating the recipe. Please try again."
 
 async def main_bot():
     print("Bot is starting...")
