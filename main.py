@@ -21,6 +21,7 @@ user_preferences = {}  # Store user preferences in-memory
 favorite_recipes = {}  # Store users' favorite recipes
 last_message = {}  # Stores last message for purpose of storing recipe
 last_query = {}  # Stores last query for purpose of storing recipe
+name = {} # Just here for testing
 
 GPTclient = OpenAI(api_key=os.environ.get('GPT_TOKEN'))
 
@@ -71,35 +72,43 @@ async def display_preferences(ctx):
 async def recipe(ctx, *, ingredients: str):
     """Generate a recipe using the provided ingredients."""
     await ctx.defer()
-    query: str = f"Give me a recipe with the following ingredients: {ingredients}."
-
-    flavor: str = ""
-    dish: str = ""
-    diet: str = ""
+    
+    flavor, dish, diet = "", "", ""
     user_id = str(ctx.author.id)
     if user_id in user_preferences:
-        flavor: str = user_preferences[user_id]["flavor"]
-        dish: str = user_preferences[user_id]["favorite_dish"]
-        diet: str = user_preferences[user_id]["diet"]
-    query += f"""
-    If possible, include my personal preferences. Do not include them if they deviate too far from the
-    recipe. For example, if I like savory and bitter flavors but the recipe asks for sweet candy, it's
-    not necessary to include savory and bitter flavors.
-    Flavors: {flavor}
-    Dishes: {dish}
-    Diet: {diet}
+        flavor = user_preferences[user_id].get("flavor", "None")
+        dish = user_preferences[user_id].get("favorite_dish", "None")
+        diet = user_preferences[user_id].get("diet", "None")
+    
+    query = f"""
+    Create a **concise** and **structured** recipe using the following ingredients: {ingredients}.
+    Please follow this format:
+    - **Dish Name**: Provide a creative and appropriate dish name.
+    - **Ingredients**: List required ingredients (avoid redundancy).
+    - **Instructions**: Give a **step-by-step** short guide (concise but clear).
+    - **Nutritional Information**: If possible, estimate calories and macronutrients.
+    
+    User Preferences:
+    - **Flavor Preferences**: {flavor}
+    - **Favorite Dishes**: {dish}
+    - **Dietary Restrictions**: {diet}
+    
+    Ensure the response is **under 2000 characters** and uses **Markdown formatting**.
     """
-
+    
     response = get_chatgpt_response(query)
-
-    # Save message history
     user_id = str(ctx.author.id)
     last_query[user_id] = ingredients
     last_message[user_id] = response
+    
+    # Send response in chunks if necessary
+    if len(response) > 2000:
+        chunks = [response[i:i+2000] for i in range(0, len(response), 2000)]
+        for chunk in chunks:
+            await ctx.send(chunk)
+    else:
+        await ctx.send(response)
 
-    # Split response into chunks of 2000 characters
-    for i in range(0, len(response), 2000):
-        await ctx.send(response[i:i+2000])
 
 @client.bridge_command(description="Save a recipe to your favorites")
 async def save_recipe(ctx):
@@ -119,11 +128,71 @@ async def show_favorites(ctx):
     """Display all the favorite recipes of the user."""
     user_id = str(ctx.author.id)
     if user_id in favorite_recipes and favorite_recipes[user_id]:
-        print(favorite_recipes[user_id])
         recipes = favorite_recipes[user_id].keys()
         await ctx.respond(f"Your favorite recipes:\n{recipes}")
     else:
         await ctx.respond("You don't have any favorite recipes yet.")
+
+@client.bridge_command(description="Recommend a recipe related to input")
+async def recommend(ctx, recipe: str):
+    """Generates a recipe based off an idea rather than ingredients"""
+    await ctx.defer()
+
+    flavor, dish, diet = "", "", ""
+    user_id = str(ctx.author.id)
+    if user_id in user_preferences:
+        flavor = user_preferences[user_id].get("flavor", "None")
+        dish = user_preferences[user_id].get("favorite_dish", "None")
+        diet = user_preferences[user_id].get("diet", "None")
+
+    query = f"""
+    Create a **concise** and **structured** recipe using the following recipe: {recipe}.
+    Please follow this format:
+    - **Dish Name**: Provide a creative and appropriate dish name.
+    - **Ingredients**: List required ingredients (avoid redundancy).
+    - **Instructions**: Give a **step-by-step** short guide (concise but clear).
+    - **Nutritional Information**: If possible, estimate calories and macronutrients.
+    
+    User Preferences:
+    - **Flavor Preferences**: {flavor}
+    - **Favorite Dishes**: {dish}
+    - **Dietary Restrictions**: {diet}
+    
+    Ensure the response is **under 2000 characters** and uses **Markdown formatting**.
+    """
+    
+    response = get_chatgpt_response(query)
+    user_id = str(ctx.author.id)
+    last_query[user_id] = recipe
+    last_message[user_id] = response
+    
+    # Send response in chunks if necessary
+    if len(response) > 2000:
+        chunks = [response[i:i+2000] for i in range(0, len(response), 2000)]
+        for chunk in chunks:
+            await ctx.send(chunk)
+    else:
+        await ctx.send(response)
+
+
+@client.bridge_command(description="nametest")
+async def nametest(ctx):
+    """dev cmd for testing local storage."""
+    user_id = str(ctx.author.id)
+    if user_id in name:
+        await ctx.respond(f"Your 'name' is: {name[user_id]}.")
+    else:
+        await ctx.respond("Sorry, but there's no 'name' in the system! Please type your name in the chat.")
+
+        def check(message):
+            return message.author == ctx.author and message.channel == ctx.channel
+
+        try:
+            msg = await client.wait_for("message", timeout=30.0, check=check)  # Wait for user input
+            name[user_id] = msg.content  # Save name
+            await ctx.send(f"Thanks! Your 'name' has been set to: {name[user_id]}.")
+        except asyncio.TimeoutError:
+            await ctx.send("You took too long to respond! Try again.")
 
 @client.bridge_command(description="Ask a question to ChatGPT")
 async def ask(ctx, *, query: str):
