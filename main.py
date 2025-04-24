@@ -334,9 +334,15 @@ async def recipe_battle(ctx, opponent: discord.Member):
 
     await ctx.respond("Battle initiated! React with 🅰️ or 🅱️ to vote!")
 
-@client.bridge_command(description="Get a surprise recipe from your favorites with optional filters")
-async def surprise_me(ctx, diet: str = "", keyword: str = ""):
-    """Send a random recipe from saved favorites with optional filters."""
+@client.bridge_command(description="Get a surprise recipe with optional filters like diet, keyword, calories, or time")
+async def surprise_me(
+    ctx,
+    diet: str = "",
+    keyword: str = "",
+    max_calories: int = 0,
+    max_prep_time: int = 0
+):
+    """Send a random saved recipe with optional filters."""
     await ctx.defer()
     user_id = str(ctx.author.id)
 
@@ -347,14 +353,38 @@ async def surprise_me(ctx, diet: str = "", keyword: str = ""):
     filtered = []
 
     for title, recipe in favorite_recipes[user_id].items():
+        # Check for each filter
         match_diet = diet.lower() in recipe.lower() if diet else True
         match_keyword = keyword.lower() in title.lower() if keyword else True
+        match_calories = True
+        match_time = True
 
-        if match_diet and match_keyword:
+        # Parse for calorie info (e.g., "Calories: 430")
+        if max_calories:
+            lines = recipe.lower().splitlines()
+            for line in lines:
+                if "calories" in line:
+                    try:
+                        cal = int("".join(filter(str.isdigit, line)))
+                        match_calories = cal <= max_calories
+                    except:
+                        pass
+
+        # Parse for prep time (e.g., "Prep time: 20 minutes" or "20 mins")
+        if max_prep_time:
+            for line in recipe.lower().splitlines():
+                if "prep" in line or "time" in line:
+                    try:
+                        minutes = int("".join(filter(str.isdigit, line)))
+                        match_time = minutes <= max_prep_time
+                    except:
+                        pass
+
+        if match_diet and match_keyword and match_calories and match_time:
             filtered.append((title, recipe))
 
     if not filtered:
-        await ctx.respond("No matching recipes found with those filters.")
+        await ctx.respond("No recipes found matching your filters.")
         return
 
     title, recipe = random.choice(filtered)
