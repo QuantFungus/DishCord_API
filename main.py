@@ -4,6 +4,7 @@ import os
 import random
 import logging
 import textwrap
+import difflib 
 from discord.ext import bridge, commands
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -148,24 +149,25 @@ async def show_favorites(ctx):
 
 @client.bridge_command(description="View a specific saved recipe by name")
 async def view_favorite(ctx, *, recipe_name: str):
-    """View the full content of a saved recipe using the original name/query."""
+    """View the full content of a saved recipe using fuzzy matching on the name/query."""
     user_id = str(ctx.author.id)
 
     if user_id not in favorite_recipes or not favorite_recipes[user_id]:
         await ctx.respond("You have no saved recipes.")
         return
 
-    matching_keys = [key for key in favorite_recipes[user_id] if recipe_name.lower() in key.lower()]
+    # Fuzzy match the query to saved recipe keys
+    matches = difflib.get_close_matches(recipe_name, favorite_recipes[user_id].keys(), n=1, cutoff=0.4)
 
-    if not matching_keys:
+    if not matches:
         await ctx.respond(f"No saved recipe found matching: **{recipe_name}**")
         return
 
-    # Show the first match
-    recipe = favorite_recipes[user_id][matching_keys[0]]
-    response = f"**{matching_keys[0]}**\n\n{recipe}"
+    # Retrieve and format the matched recipe
+    recipe = favorite_recipes[user_id][matches[0]]
+    response = f"**{matches[0]}**\n\n{recipe}"
 
-    # Respond in chunks if it's too long
+    # Send in chunks if it's too long
     for i in range(0, len(response), 2000):
         await ctx.send(response[i:i+2000])
 
