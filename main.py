@@ -255,6 +255,27 @@ async def rate_recipe(ctx, stars: int, *, review: str = ""):
     recipe_reviews[user_id] = entry
     await ctx.respond(f"Thanks for rating! ⭐ {stars}/5\nYour review: {review or '(none)'}")
 
+@client.bridge_command(description="Battle your last recipe with another user's recipe")
+async def recipe_battle(ctx, opponent: discord.Member):
+    """Compare your last recipe with another user's and let others vote."""
+    await ctx.defer()
+    user_id = str(ctx.author.id)
+    opp_id = str(opponent.id)
+
+    if user_id not in last_message or opp_id not in last_message:
+        await ctx.respond("Both users need to have generated a recipe first!")
+        return
+
+    embed = discord.Embed(title="🍽️ Recipe Battle!", description="React to vote for the best recipe!")
+    embed.add_field(name=f"{ctx.author.display_name}'s Recipe", value=last_message[user_id][:1000], inline=False)
+    embed.add_field(name=f"{opponent.display_name}'s Recipe", value=last_message[opp_id][:1000], inline=False)
+    msg = await ctx.send(embed=embed)
+
+    await msg.add_reaction("🅰️")
+    await msg.add_reaction("🅱️")
+
+    await ctx.respond("Battle initiated! React with 🅰️ or 🅱️ to vote!")
+
 def get_chatgpt_response(query: str) -> str:
     
     completion = GPTclient.chat.completions.create(
