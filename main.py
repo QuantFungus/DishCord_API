@@ -203,6 +203,35 @@ async def ask(ctx, *, query: str):
     for i in range(0, len(response), 2000):
         await ctx.send(response[i:i+2000])
 
+@client.bridge_command(description="Try a totally random recipe!")
+async def roulette(ctx, diet: str = "", max_calories: int = 0):
+    """Generate a random recipe with optional dietary or calorie filters."""
+    await ctx.defer()
+
+    filters = ""
+    if diet:
+        filters += f"Dietary restriction: {diet}. "
+    if max_calories > 0:
+        filters += f"Recipe should be under {max_calories} calories. "
+
+    query = f"""
+    Give me a completely random but interesting recipe. {filters}
+    Make sure to follow this format:
+    - **Dish Name**
+    - **Ingredients**
+    - **Instructions**
+    - **Calories + macros** (estimate if possible)
+    Keep it under 2000 characters and format using Markdown.
+    """
+
+    response = get_chatgpt_response(query)
+    user_id = str(ctx.author.id)
+    last_query[user_id] = f"roulette ({filters.strip()})"
+    last_message[user_id] = response
+
+    for i in range(0, len(response), 2000):
+        await ctx.send(response[i:i+2000])
+
 def get_chatgpt_response(query: str) -> str:
     
     completion = GPTclient.chat.completions.create(
